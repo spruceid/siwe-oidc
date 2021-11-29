@@ -1,0 +1,27 @@
+version: "3"
+services:
+  siwe-oidc:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      SIWEOIDC_ADDRESS: "0.0.0.0"
+      # Need siwe-oidc in /etc/hosts for localhost to allow both the host and Keycloak to reach the IdP
+      SIWEOIDC_BASE_URL: "http://siwe-oidc:8000/"
+      SIWEOIDC_REDIS_URL: "redis://redis"
+      SIWEOIDC_DEFAULT_CLIENTS: '{sdf="sdf"}'
+      RUST_LOG: "siwe_oidc=debug,tower_http=debug"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    ports:
+      - "8080:8080"
+    environment:
+      DB_VENDOR: H2
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: admin
+
+  redis:
+    image: redis:6-alpine
+    ports:
+      - "6379:6379"
