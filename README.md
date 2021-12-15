@@ -28,6 +28,9 @@ through environment variables:
 The current flow is very basic -- after the user is authenticated you will
 receive an Ethereum address as the subject (`sub` field).
 
+For the core OIDC information, it is available under
+`/.well-known/openid-configuration`.
+
 ### TODO Items
 
 * Additional information, from native projects (e.g. ENS domains), to more
