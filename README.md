@@ -23,6 +23,16 @@ through environment variables:
 * `SIWEOIDC_RSA_PEM` is the signing key, in PEM format. One will be generated if
   none is provided.
 
+### OIDC Functionalities
+
+The current flow is very basic -- after the user is authenticated you will
+receive an Ethereum address as the subject (`sub` field).
+
+### TODO Items
+
+* Additional information, from native projects (e.g. ENS domains), to more
+  traditional ones (e.g. email).
+
 ## Development
 
 A Docker Compose is available to test the IdP locally with Keycloak.
