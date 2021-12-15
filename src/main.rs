@@ -29,7 +29,7 @@ use openidconnect::{
         CoreSubjectIdentifierType, CoreTokenResponse, CoreTokenType, CoreUserInfoClaims,
     },
     registration::{EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse},
-    AccessToken, Audience, AuthUrl, ClientId, EmptyAdditionalClaims,
+    AccessToken, Audience, AuthUrl, ClientId, ClientSecret, EmptyAdditionalClaims,
     EmptyAdditionalProviderMetadata, EmptyExtraTokenFields, IssuerUrl, JsonWebKeyId,
     JsonWebKeySetUrl, Nonce, PrivateSigningKey, RedirectUrl, RegistrationUrl, ResponseTypes, Scope,
     StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
@@ -565,6 +565,7 @@ async fn register(
         EmptyAdditionalClientMetadata::default(),
         EmptyAdditionalClientRegistrationResponse::default(),
     )
+    .set_client_secret(Some(ClientSecret::new(secret.to_string())))
     .into())
 }
 
