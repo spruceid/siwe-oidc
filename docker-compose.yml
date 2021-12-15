@@ -2,6 +2,7 @@ version: "3"
 services:
   siwe-oidc:
     build: .
+    image: ghcr.io/spruceid/siwe_oidc:latest
     ports:
       - "8000:8000"
     environment:
