@@ -1,4 +1,5 @@
-use async_redis_session::RedisSessionStore;
+// use async_redis_session::RedisSessionStore;
+use async_session::MemoryStore;
 use async_session::{Session, SessionStore as _};
 use axum::{
     async_trait,
@@ -28,7 +29,8 @@ where
     type Rejection = (StatusCode, String);
 
     async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
-        let Extension(store) = match Extension::<RedisSessionStore>::from_request(req).await {
+        // TODO sessions are set without expiry
+        let Extension(store) = match Extension::<MemoryStore>::from_request(req).await {
             Ok(s) => s,
             Err(e) => {
                 return Err((
@@ -80,6 +82,14 @@ where
 
         let session = match store.load_session(session_cookie.value().to_string()).await {
             Ok(Some(s)) => s,
+            Err(e) => {
+                debug!("Could not load session: {}", e);
+                let mut cookie = session_cookie.clone();
+                cookie.make_removal();
+                return Ok(Self::InvalidUserSession(
+                    cookie.to_string().parse().unwrap(),
+                ));
+            }
             _ => {
                 debug!("Could not load session");
                 let mut cookie = session_cookie.clone();

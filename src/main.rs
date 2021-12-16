@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
-use async_redis_session::RedisSessionStore;
+// use async_redis_session::RedisSessionStore;
+use async_session::MemoryStore;
 use axum::{
     body::{Bytes, Full},
     error_handling::HandleErrorExt,
@@ -12,7 +13,8 @@ use axum::{
     routing::{get, post, service_method_routing},
     AddExtensionLayer, Json, Router,
 };
-use bb8_redis::{bb8, bb8::Pool, redis::AsyncCommands, RedisConnectionManager};
+use bb8::Pool;
+// use bb8_redis::{bb8, bb8::Pool, redis::AsyncCommands, RedisConnectionManager};
 use chrono::{Duration, Utc};
 use figment::{
     providers::{Env, Format, Serialized, Toml},
@@ -29,12 +31,13 @@ use openidconnect::{
         CoreSubjectIdentifierType, CoreTokenResponse, CoreTokenType, CoreUserInfoClaims,
     },
     registration::{EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse},
-    AccessToken, Audience, AuthUrl, ClientId, EmptyAdditionalClaims,
+    AccessToken, Audience, AuthUrl, ClientId, ClientSecret, EmptyAdditionalClaims,
     EmptyAdditionalProviderMetadata, EmptyExtraTokenFields, IssuerUrl, JsonWebKeyId,
     JsonWebKeySetUrl, Nonce, PrivateSigningKey, RedirectUrl, RegistrationUrl, ResponseTypes, Scope,
     StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
 };
 use rand::rngs::OsRng;
+use redis::Commands;
 use rsa::{
     pkcs1::{FromRsaPrivateKey, ToRsaPrivateKey},
     RsaPrivateKey,
@@ -52,8 +55,10 @@ use urlencoding::decode;
 use uuid::Uuid;
 
 mod config;
+mod redis_conn;
 mod session;
 
+use redis_conn::*;
 use session::*;
 
 const KID: &str = "key1";
@@ -170,7 +175,7 @@ async fn provider_metadata(
 
 #[derive(Deserialize)]
 struct TokenForm {
-    code: String,
+    code: Uuid,
     client_id: String,
     client_secret: Option<String>,
     grant_type: CoreGrantType, // TODO should just be authorization_code apparently?
@@ -198,7 +203,6 @@ async fn token(
     if let Some(secret) = form.client_secret.clone() {
         let stored_secret: Option<String> = conn
             .get(format!("{}/{}", KV_CLIENT_PREFIX, form.client_id))
-            .await
             .map_err(|e| anyhow!("Failed to get kv: {}", e))?;
         if stored_secret.is_none() {
             Err(CustomError::Unauthorized(
@@ -214,7 +218,6 @@ async fn token(
 
     let serialized_entry: Option<Vec<u8>> = conn
         .get(form.code.to_string())
-        .await
         .map_err(|e| anyhow!("Failed to get kv: {}", e))?;
     if serialized_entry.is_none() {
         Err(CustomError::BadRequest("Unknown code.".to_string()))?;
@@ -237,7 +240,6 @@ async fn token(
         ),
         ENTRY_LIFETIME,
     )
-    .await
     .map_err(|e| anyhow!("Failed to set kv: {}", e))?;
 
     let access_token = AccessToken::new(form.code.to_string().clone());
@@ -279,7 +281,7 @@ struct AuthorizeParams {
     redirect_uri: RedirectUrl,
     scope: Scope,
     response_type: CoreResponseType,
-    state: String,
+    state: String, // TODO not required
     nonce: Option<Nonce>,
 }
 
@@ -527,7 +529,6 @@ async fn sign_in(
         ),
         ENTRY_LIFETIME,
     )
-    .await
     .map_err(|e| anyhow!("Failed to set kv: {}", e))?;
 
     let mut url = params.redirect_uri.url().clone();
@@ -556,7 +557,6 @@ async fn register(
         .await
         .map_err(|e| anyhow!("Failed to get connection to database: {}", e))?;
     conn.set(format!("{}/{}", KV_CLIENT_PREFIX, id), secret.to_string())
-        .await
         .map_err(|e| anyhow!("Failed to set kv: {}", e))?;
 
     Ok(CoreClientRegistrationResponse::new(
@@ -565,6 +565,7 @@ async fn register(
         EmptyAdditionalClientMetadata::default(),
         EmptyAdditionalClientRegistrationResponse::default(),
     )
+    .set_client_secret(Some(ClientSecret::new(secret.to_string())))
     .into())
 }
 
@@ -583,7 +584,6 @@ async fn userinfo(
         .map_err(|e| anyhow!("Failed to get connection to database: {}", e))?;
     let serialized_entry: Option<Vec<u8>> = conn
         .get(code)
-        .await
         .map_err(|e| anyhow!("Failed to get kv: {}", e))?;
     if serialized_entry.is_none() {
         Err(CustomError::BadRequest("Unknown code.".to_string()))?;
@@ -601,6 +601,7 @@ async fn userinfo(
     .into())
 }
 
+// TODO ping Redis
 async fn healthcheck() {}
 
 #[tokio::main]
@@ -614,20 +615,20 @@ async fn main() {
 
     let manager = RedisConnectionManager::new(config.redis_url.clone()).unwrap();
     let pool = bb8::Pool::builder().build(manager.clone()).await.unwrap();
-    let pool2 = bb8::Pool::builder().build(manager).await.unwrap();
+    // let pool2 = bb8::Pool::builder().build(manager).await.unwrap();
 
-    let mut conn = pool2
-        .get()
-        .await
-        .map_err(|e| anyhow!("Failed to get connection to database: {}", e))
-        .unwrap();
-    for (id, secret) in &config.default_clients.clone() {
-        let _: () = conn
-            .set(format!("{}/{}", KV_CLIENT_PREFIX, id), secret)
-            .await
-            .map_err(|e| anyhow!("Failed to set kv: {}", e))
-            .unwrap();
-    }
+    // let mut conn = pool2
+    //     .get()
+    //     .await
+    //     .map_err(|e| anyhow!("Failed to get connection to database: {}", e))
+    //     .unwrap();
+    // for (id, secret) in &config.default_clients.clone() {
+    //     let _: () = conn
+    //         .set(format!("{}/{}", KV_CLIENT_PREFIX, id), secret)
+    //         .await
+    //         .map_err(|e| anyhow!("Failed to set kv: {}", e))
+    //         .unwrap();
+    // }
 
     let private_key = if let Some(key) = &config.rsa_pem {
         RsaPrivateKey::from_pkcs1_pem(&key)
@@ -702,11 +703,12 @@ async fn main() {
         .layer(AddExtensionLayer::new(private_key))
         .layer(AddExtensionLayer::new(config.clone()))
         .layer(AddExtensionLayer::new(pool))
-        .layer(AddExtensionLayer::new(
-            RedisSessionStore::new(config.redis_url.clone())
-                .unwrap()
-                .with_prefix("async-sessions/"),
-        ))
+        // .layer(AddExtensionLayer::new(
+        //     RedisSessionStore::new(config.redis_url.clone())
+        //         .unwrap()
+        //         .with_prefix("async-sessions/"),
+        // ))
+        .layer(AddExtensionLayer::new(MemoryStore::new()))
         .layer(TraceLayer::new_for_http());
 
     let addr = SocketAddr::from((config.address, config.port));
