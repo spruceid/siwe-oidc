@@ -1,10 +1,10 @@
 <script lang="ts">
-	import Portis from "@portis/web3";
-	import { Client, SiweSession } from "@spruceid/siwe-web3modal";
-	import Torus from "@toruslabs/torus-embed";
-	import WalletConnectProvider from "@walletconnect/web3-provider";
-	import Fortmatic from "fortmatic";
-	import WalletLink from "walletlink";
+	import Portis from '@portis/web3';
+	import { Client } from '@spruceid/siwe-web3modal';
+	import Torus from '@toruslabs/torus-embed';
+	import WalletConnectProvider from '@walletconnect/web3-provider';
+	import Fortmatic from 'fortmatic';
+	import WalletLink from 'walletlink';
 
 	// TODO: REMOVE DEFAULTS:
 	// main.ts will parse the params from the server
@@ -14,24 +14,24 @@
 	export let state: string;
 	export let oidc_nonce: string;
 
-	let uri: string = window.location.href.split("?")[0];
+	let uri: string = window.location.href.split('?')[0];
 
 	// Could be exposed in the future.
 	export let useENS: boolean = true;
 
-	$: status = "Not Logged In";
+	$: status = 'Not Logged In';
 
 	let client = new Client({
 		session: {
 			domain,
 			uri,
 			useENS,
-			version: "1",
+			version: '1',
 			// TODO: Vet this as the default statement.
-			statement: "Sign-In With Ethereum OpenID-Connect",
+			statement: 'Sign-In With Ethereum OpenID-Connect',
 		},
 		modal: {
-			theme: "dark",
+			theme: 'dark',
 			providerOptions: {
 				walletconnect: {
 					package: WalletConnectProvider,
@@ -55,30 +55,26 @@
 						key: process.env.FORTMATIC_KEY,
 					},
 				},
-				"custom-coinbase": {
+				'custom-coinbase': {
 					display: {
-						logo: "img/coinbase.svg",
-						name: "Coinbase",
-						description: "Scan with WalletLink to connect",
+						logo: 'img/coinbase.svg',
+						name: 'Coinbase',
+						description: 'Scan with WalletLink to connect',
 					},
 					options: {
-						appName: "Sign-In with Ethereum",
+						appName: 'Sign-In with Ethereum',
 						networkUrl: `https://mainnet.infura.io/v3/${process.env.INFURA_ID}`,
 						chainId: 1,
 						darkMode: false,
 					},
 					package: WalletLink,
 					connector: async (_, options) => {
-						const { appName, networkUrl, chainId, darkMode } =
-							options;
+						const { appName, networkUrl, chainId, darkMode } = options;
 						const walletLink = new WalletLink({
 							appName,
 							darkMode,
 						});
-						const provider = walletLink.makeWeb3Provider(
-							networkUrl,
-							chainId
-						);
+						const provider = walletLink.makeWeb3Provider(networkUrl, chainId);
 						await provider.enable();
 						return provider;
 					},
@@ -87,32 +83,211 @@
 		},
 	});
 
-	let oidc_nonce_param = "";
-	if (oidc_nonce != "") {
+	let oidc_nonce_param = '';
+	if (oidc_nonce != '') {
 		oidc_nonce_param = `&oidc_nonce=${oidc_nonce}`;
 	}
-	client.on("signIn", (result) => {
+	client.on('signIn', (result) => {
 		console.log(result);
-		window.location.replace(`/sign_in?redirect_uri=${encodeURI(redirect)}&state=${encodeURI(state)}${encodeURI(oidc_nonce_param)}`);
+		window.location.replace(
+			`/sign_in?redirect_uri=${encodeURI(redirect)}&state=${encodeURI(state)}${encodeURI(oidc_nonce_param)}`,
+		);
 	});
 </script>
 
-<main>
-	<div>
-		<h2>Sign-In With Ethereum</h2>
-		<p>{status}</p>
-		<!-- TODO: Add copy / info about who is requesting here. -->
+<div
+	class="bg-no-repeat bg-cover bg-center bg-swe-landing bg-gray flex-grow w-full h-screen items-center flex justify-center flex-wrap flex-col"
+	style="background-image: url('img/swe-landing.svg');"
+>
+	<div
+		class="w-96 text-center bg-white rounded-20 font-satoshi text-grey flex h-96 flex-col p-12 shadow-lg shadow-white"
+	>
+		<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
+		<h5>Welcome</h5>
+		<span class="text-xs">Sign-In with Ethereum to continue to your application</span>
+
 		<button
+			class="h-12 border hover:scale-105 justify-evenly shadow-xl border-white mt-auto duration-100 ease-in-out transition-all transform flex items-center"
 			on:click={() => {
 				client.signIn(nonce).catch((e) => {
 					console.error(e);
 				});
 			}}
 		>
-			Sign In
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				clip-rule="evenodd"
+				fill-rule="evenodd"
+				stroke-linejoin="round"
+				stroke-miterlimit="1.41421"
+				viewBox="170 30 220 350"
+				class="w-6 h-8"
+			>
+				<g fill-rule="nonzero" transform="matrix(.781253 0 0 .781253 180 37.1453)">
+					<path d="m127.961 0-2.795 9.5v275.668l2.795 2.79 127.962-75.638z" fill="#343434" /><path
+						d="m127.962 0-127.962 212.32 127.962 75.639v-133.801z"
+						fill="#8c8c8c"
+					/>
+					<path d="m127.961 312.187-1.575 1.92v98.199l1.575 4.601 128.038-180.32z" fill="#3c3c3b" /><path
+						d="m127.962 416.905v-104.72l-127.962-75.6z"
+						fill="#8c8c8c"
+					/>
+					<path d="m127.961 287.958 127.96-75.637-127.96-58.162z" fill="#141414" /><path
+						d="m.001 212.321 127.96 75.637v-133.799z"
+						fill="#393939"
+					/>
+				</g>
+			</svg>
+			<p class="font-bold">Sign-In with Ethereum</p>
 		</button>
 	</div>
-</main>
+</div>
 
-<style>
+<style global lang="postcss">
+	@tailwind base;
+	@tailwind components;
+	@tailwind utilities;
+
+	.tooltip {
+		@apply invisible absolute;
+	}
+
+	.has-tooltip:hover .tooltip {
+		@apply visible z-50;
+	}
+	html,
+	body {
+		position: relative;
+		width: 100vw;
+		height: 100vh;
+		margin: 0px;
+		padding: 0px;
+		font-size: 18px;
+		background: #ecf2fe;
+		display: flex;
+		flex-direction: column;
+		overflow-x: hidden;
+		@apply font-rajdhani;
+	}
+
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		@apply font-extrabold;
+		@apply font-rajdhani;
+	}
+
+	h1 {
+		font-size: 76px;
+		line-height: 129px;
+		letter-spacing: -4.5%;
+	}
+
+	h2 {
+		font-size: 66px;
+		line-height: 101px;
+		letter-spacing: -3%;
+	}
+
+	h3 {
+		font-size: 52px;
+		line-height: 80px;
+		letter-spacing: -1.5%;
+	}
+
+	h4 {
+		font-size: 48px;
+		line-height: 63px;
+		letter-spacing: -1%;
+	}
+
+	h5 {
+		font-size: 32px;
+		line-height: 49px;
+		letter-spacing: -0.5%;
+	}
+
+	h6 {
+		font-size: 24px;
+		line-height: 37px;
+		letter-spacing: -0.5%;
+	}
+
+	body {
+		color: #222222;
+	}
+
+	a {
+		text-decoration: none;
+		color: #04d2ca;
+	}
+
+	td,
+	th {
+		font-family: 'Rajdhani';
+		font-weight: 400;
+	}
+
+	pre {
+		white-space: pre-wrap; /* Since CSS 2.1 */
+		white-space: -moz-pre-wrap; /* Mozilla, since 1999 */
+		white-space: -pre-wrap; /* Opera 4-6 */
+		white-space: -o-pre-wrap; /* Opera 7 */
+		word-wrap: break-word; /* Internet Explorer 5.5+ */
+	}
+
+	.web3modal-modal-lightbox {
+		z-index: 30 !important;
+	}
+
+	.walletconnect-modal__base {
+		background-color: #273137 !important;
+	}
+
+	.walletconnect-qrcode__text {
+		color: white !important;
+	}
+
+	.walletconnect-modal__mobile__toggle {
+		background: rgba(255, 255, 255, 0.1) !important;
+	}
+
+	.walletconnect-qrcode__image {
+		border: 24px solid white !important;
+		border-radius: 8px !important;
+	}
+
+	.walletconnect-modal__base__row:hover {
+		background: rgba(255, 255, 255, 0.1) !important;
+	}
+
+	.walletconnect-modal__mobile__toggle_selector {
+		background: rgba(255, 255, 255, 0.2) !important;
+	}
+
+	/**
+	Custom scrollbar settings
+	*/
+	::-webkit-scrollbar-track {
+		border-radius: 8px;
+		background-color: #ccc;
+	}
+
+	::-webkit-scrollbar-thumb {
+		border-radius: 8px;
+		background-color: #888;
+	}
+	::-webkit-scrollbar {
+		height: 6px;
+		border-radius: 8px;
+		width: 6px;
+		background-color: #ccc;
+	}
+
+	.grecaptcha-badge {
+		visibility: hidden;
+	}
 </style>

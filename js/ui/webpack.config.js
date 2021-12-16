@@ -1,7 +1,6 @@
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const path = require('path');
 const sveltePreprocess = require('svelte-preprocess');
-const Dotenv = require('dotenv-webpack');
 const webpack = require('webpack');
 
 const mode = process.env.NODE_ENV || 'development';
@@ -37,26 +36,40 @@ module.exports = {
 		chunkFilename: '[name].[id].js'
 	},
 	module: {
-			rules: [
-				{
-					test: /\.ts$/,
-					loader: 'ts-loader',
-					exclude: /node_modules/
-				},
-				{
-					test: /\.svelte$/,
-					use: {
-						loader: 'svelte-loader',
-						options: {
-							compilerOptions: {
-								dev: !prod
-							},
-							emitCss: prod,
-							hotReload: !prod,
-								preprocess: sveltePreprocess({ sourceMap: !prod })
-						}
+		rules: [
+			{
+				test: /\.ts$/,
+				loader: 'ts-loader',
+				exclude: /node_modules/
+			},
+			{
+				test: /\.svelte$/,
+				use: {
+					loader: 'svelte-loader',
+					options: {
+						compilerOptions: {
+							dev: !prod
+						},
+						emitCss: prod,
+						hotReload: !prod,
+						preprocess: sveltePreprocess({
+							sourceMap: !prod,
+							postcss: true,
+						}),
 					}
-				},
+				}
+			},
+			{
+				test: /\.svg$/,
+				use: [
+					{
+						loader: 'svg-url-loader',
+						options: {
+							limit: 10000,
+						},
+					},
+				],
+			},
 			{
 				test: /\.css$/,
 				use: [
@@ -82,7 +95,6 @@ module.exports = {
 		new MiniCssExtractPlugin({
 			filename: '[name].css'
 		}),
-		new Dotenv(),
 	],
 	devtool: prod ? false : 'source-map',
 	devServer: {
