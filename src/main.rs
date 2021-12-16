@@ -240,7 +240,7 @@ async fn token(
     .await
     .map_err(|e| anyhow!("Failed to set kv: {}", e))?;
 
-    let access_token = AccessToken::new(form.code.clone());
+    let access_token = AccessToken::new(form.code.to_string().clone());
     let core_id_token = CoreIdTokenClaims::new(
         IssuerUrl::from_url(config.base_url),
         vec![Audience::new(form.client_id.clone())],
@@ -650,6 +650,17 @@ async fn main() {
         .nest(
             "/build",
             service_method_routing::get(ServeDir::new("./static/build")).handle_error(
+                |error: std::io::Error| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled internal error: {}", error),
+                    )
+                },
+            ),
+        )
+        .nest(
+            "/img",
+            service_method_routing::get(ServeDir::new("./static/img")).handle_error(
                 |error: std::io::Error| {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,

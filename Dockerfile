@@ -15,6 +15,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 FROM node:16-alpine as node_builder
 ADD --chown=node:node ./static /siwe-oidc/static
+ADD --chown=node:node ./js/ui/img /siwe-oidc/static/img
 ADD --chown=node:node ./js/ui /siwe-oidc/js/ui
 WORKDIR /siwe-oidc/js/ui
 RUN npm install
