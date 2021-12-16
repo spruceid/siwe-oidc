@@ -96,12 +96,10 @@
 </script>
 
 <div
-	class="bg-no-repeat bg-cover bg-center bg-swe-landing bg-gray flex-grow w-full h-screen items-center flex justify-center flex-wrap flex-col"
+	class="bg-no-repeat bg-cover bg-center bg-swe-landing font-satoshi bg-gray flex-grow w-full h-screen items-center flex justify-center flex-wrap flex-col"
 	style="background-image: url('img/swe-landing.svg');"
 >
-	<div
-		class="w-96 text-center bg-white rounded-20 font-satoshi text-grey flex h-96 flex-col p-12 shadow-lg shadow-white"
-	>
+	<div class="w-96 text-center bg-white rounded-20 text-grey flex h-96 flex-col p-12 shadow-lg shadow-white">
 		<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
 		<h5>Welcome</h5>
 		<span class="text-xs">Sign-In with Ethereum to continue to your application</span>
@@ -167,7 +165,7 @@
 		display: flex;
 		flex-direction: column;
 		overflow-x: hidden;
-		@apply font-rajdhani;
+		@apply font-satoshi;
 	}
 
 	h1,
@@ -177,7 +175,7 @@
 	h5,
 	h6 {
 		@apply font-extrabold;
-		@apply font-rajdhani;
+		@apply font-satoshi;
 	}
 
 	h1 {
@@ -227,7 +225,7 @@
 
 	td,
 	th {
-		font-family: 'Rajdhani';
+		font-family: 'Satoshi';
 		font-weight: 400;
 	}
 
