@@ -363,7 +363,7 @@ async fn authorize(
 
     let state = if let Some(s) = params.0.state.clone() {
         s
-    } else if let Some(_) = params.0.request_uri {
+    } else if params.0.request_uri.is_some() {
         let mut url = params.0.redirect_uri.url().clone();
         url.query_pairs_mut().append_pair(
             "error",
@@ -377,7 +377,7 @@ async fn authorize(
                     .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
             ),
         ));
-    } else if let Some(_) = params.0.request {
+    } else if params.0.request.is_some() {
         let mut url = params.0.redirect_uri.url().clone();
         url.query_pairs_mut().append_pair(
             "error",
@@ -407,24 +407,21 @@ async fn authorize(
         ));
     };
 
-    match params.0.prompt {
-        Some(CoreAuthPrompt::None) => {
-            let mut url = params.redirect_uri.url().clone();
-            url.query_pairs_mut().append_pair("state", &state);
-            url.query_pairs_mut().append_pair(
-                "error",
-                CoreAuthErrorResponseType::InteractionRequired.as_ref(),
-            );
-            return Ok((
-                HeaderMap::new(),
-                Redirect::to(
-                    url.as_str()
-                        .parse()
-                        .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
-                ),
-            ));
-        }
-        _ => (),
+    if let Some(CoreAuthPrompt::None) = params.0.prompt {
+        let mut url = params.redirect_uri.url().clone();
+        url.query_pairs_mut().append_pair("state", &state);
+        url.query_pairs_mut().append_pair(
+            "error",
+            CoreAuthErrorResponseType::InteractionRequired.as_ref(),
+        );
+        return Ok((
+            HeaderMap::new(),
+            Redirect::to(
+                url.as_str()
+                    .parse()
+                    .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
+            ),
+        ));
     }
 
     if params.0.response_type.is_none() {
