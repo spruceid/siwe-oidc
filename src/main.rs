@@ -23,16 +23,18 @@ use hex::FromHex;
 use iri_string::types::{UriAbsoluteString, UriString};
 use openidconnect::{
     core::{
-        CoreClaimName, CoreClientAuthMethod, CoreClientMetadata, CoreClientRegistrationResponse,
-        CoreGrantType, CoreIdToken, CoreIdTokenClaims, CoreIdTokenFields, CoreJsonWebKeySet,
+        CoreAuthErrorResponseType, CoreAuthPrompt, CoreClaimName, CoreClientAuthMethod,
+        CoreClientMetadata, CoreClientRegistrationResponse, CoreErrorResponseType, CoreGrantType,
+        CoreIdToken, CoreIdTokenClaims, CoreIdTokenFields, CoreJsonWebKeySet,
         CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseType, CoreRsaPrivateSigningKey,
         CoreSubjectIdentifierType, CoreTokenResponse, CoreTokenType, CoreUserInfoClaims,
     },
     registration::{EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse},
-    AccessToken, Audience, AuthUrl, ClientId, EmptyAdditionalClaims,
+    url::Url,
+    AccessToken, Audience, AuthUrl, ClientId, ClientSecret, EmptyAdditionalClaims,
     EmptyAdditionalProviderMetadata, EmptyExtraTokenFields, IssuerUrl, JsonWebKeyId,
-    JsonWebKeySetUrl, Nonce, PrivateSigningKey, RedirectUrl, RegistrationUrl, ResponseTypes, Scope,
-    StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
+    JsonWebKeySetUrl, Nonce, PrivateSigningKey, RedirectUrl, RegistrationUrl, RequestUrl,
+    ResponseTypes, Scope, StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
 };
 use rand::rngs::OsRng;
 use rsa::{
@@ -52,20 +54,28 @@ use urlencoding::decode;
 use uuid::Uuid;
 
 mod config;
+mod db;
 mod session;
 
+use db::*;
 use session::*;
 
 const KID: &str = "key1";
-const KV_CLIENT_PREFIX: &str = "clients";
-const ENTRY_LIFETIME: usize = 60 * 60 * 24 * 2;
+const ENTRY_LIFETIME: usize = 30;
 
 type ConnectionPool = Pool<RedisConnectionManager>;
+
+#[derive(Serialize, Debug)]
+pub struct TokenError {
+    pub error: CoreErrorResponseType,
+}
 
 #[derive(Debug, Error)]
 pub enum CustomError {
     #[error("{0}")]
     BadRequest(String),
+    #[error("{0:?}")]
+    BadRequestToken(Json<TokenError>),
     #[error("{0}")]
     Unauthorized(String),
     #[error(transparent)]
@@ -78,11 +88,17 @@ impl IntoResponse for CustomError {
 
     fn into_response(self) -> Response<Self::Body> {
         match self {
-            CustomError::BadRequest(_) => (StatusCode::BAD_REQUEST, self.to_string()),
-            CustomError::Unauthorized(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
-            CustomError::Other(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            CustomError::BadRequest(_) => {
+                (StatusCode::BAD_REQUEST, self.to_string()).into_response()
+            }
+            CustomError::BadRequestToken(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+            CustomError::Unauthorized(_) => {
+                (StatusCode::UNAUTHORIZED, self.to_string()).into_response()
+            }
+            CustomError::Other(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()).into_response()
+            }
         }
-        .into_response()
     }
 }
 
@@ -163,29 +179,33 @@ async fn provider_metadata(
             .join("register")
             .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
     )))
-    .set_token_endpoint_auth_methods_supported(Some(vec![CoreClientAuthMethod::ClientSecretPost]));
+    .set_token_endpoint_auth_methods_supported(Some(vec![
+        CoreClientAuthMethod::ClientSecretBasic,
+        CoreClientAuthMethod::ClientSecretPost,
+    ]));
 
     Ok(pm.into())
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct TokenForm {
     code: String,
-    client_id: String,
+    client_id: Option<String>,
     client_secret: Option<String>,
     grant_type: CoreGrantType, // TODO should just be authorization_code apparently?
 }
 
 // TODO should check Authorization header
 // Actually, client secret can be
-// 1. in the POST (currently supported)
-// 2. Authorization header
-// 3. JWT
-// 4. signed JWT
+// 1. in the POST (currently supported) [x]
+// 2. Authorization header              [x]
+// 3. JWT                               [ ]
+// 4. signed JWT                        [ ]
 // according to Keycloak
 
 async fn token(
     form: Form<TokenForm>,
+    bearer: Option<TypedHeader<Authorization<Bearer>>>,
     Extension(private_key): Extension<RsaPrivateKey>,
     Extension(config): Extension<config::Config>,
     Extension(pool): Extension<ConnectionPool>,
@@ -195,29 +215,17 @@ async fn token(
         .await
         .map_err(|e| anyhow!("Failed to get connection to database: {}", e))?;
 
-    if let Some(secret) = form.client_secret.clone() {
-        let stored_secret: Option<String> = conn
-            .get(format!("{}/{}", KV_CLIENT_PREFIX, form.client_id))
-            .await
-            .map_err(|e| anyhow!("Failed to get kv: {}", e))?;
-        if stored_secret.is_none() {
-            Err(CustomError::Unauthorized(
-                "Unrecognised client id.".to_string(),
-            ))?;
-        }
-        if secret != stored_secret.unwrap() {
-            Err(CustomError::Unauthorized("Bad secret.".to_string()))?;
-        }
-    } else if config.require_secret {
-        Err(CustomError::Unauthorized("Secret required.".to_string()))?;
-    }
-
     let serialized_entry: Option<Vec<u8>> = conn
         .get(form.code.to_string())
         .await
         .map_err(|e| anyhow!("Failed to get kv: {}", e))?;
     if serialized_entry.is_none() {
-        Err(CustomError::BadRequest("Unknown code.".to_string()))?;
+        return Err(CustomError::BadRequestToken(
+            TokenError {
+                error: CoreErrorResponseType::InvalidGrant,
+            }
+            .into(),
+        ));
     }
     let code_entry: CodeEntry = bincode::deserialize(
         &hex::decode(serialized_entry.unwrap())
@@ -225,9 +233,37 @@ async fn token(
     )
     .map_err(|e| anyhow!("Failed to deserialize code: {}", e))?;
 
+    let client_id = if let Some(c) = form.client_id.clone() {
+        c
+    } else {
+        code_entry.client_id.clone()
+    };
+
+    if let Some(secret) = if let Some(TypedHeader(Authorization(b))) = bearer {
+        Some(b.token().to_string())
+    } else {
+        form.client_secret.clone()
+    } {
+        let conn2 = pool
+            .get()
+            .await
+            .map_err(|e| anyhow!("Failed to get connection to database: {}", e))?;
+        let client_entry = get_client(conn2, client_id.clone()).await?;
+        if client_entry.is_none() {
+            return Err(CustomError::Unauthorized(
+                "Unrecognised client id.".to_string(),
+            ));
+        }
+        if secret != client_entry.unwrap().secret {
+            return Err(CustomError::Unauthorized("Bad secret.".to_string()));
+        }
+    } else if config.require_secret {
+        return Err(CustomError::Unauthorized("Secret required.".to_string()));
+    }
+
     if code_entry.exchange_count > 0 {
         // TODO use Oauth error response
-        Err(anyhow!("Code was previously exchanged."))?;
+        return Err(anyhow!("Code was previously exchanged.").into());
     }
     conn.set_ex(
         form.code.to_string(),
@@ -240,10 +276,10 @@ async fn token(
     .await
     .map_err(|e| anyhow!("Failed to set kv: {}", e))?;
 
-    let access_token = AccessToken::new(form.code.to_string().clone());
+    let access_token = AccessToken::new(form.code.to_string());
     let core_id_token = CoreIdTokenClaims::new(
         IssuerUrl::from_url(config.base_url),
-        vec![Audience::new(form.client_id.clone())],
+        vec![Audience::new(client_id.clone())],
         Utc::now() + Duration::seconds(60),
         Utc::now(),
         StandardClaims::new(SubjectIdentifier::new(code_entry.address)),
@@ -278,58 +314,162 @@ struct AuthorizeParams {
     client_id: String,
     redirect_uri: RedirectUrl,
     scope: Scope,
-    response_type: CoreResponseType,
-    state: String,
+    response_type: Option<CoreResponseType>,
+    state: Option<String>,
     nonce: Option<Nonce>,
+    prompt: Option<CoreAuthPrompt>,
+    request_uri: Option<RequestUrl>,
+    request: Option<String>,
 }
 
 // TODO handle `registration` parameter
 async fn authorize(
     session: UserSessionFromSession,
     params: Query<AuthorizeParams>,
-    // Extension(private_key): Extension<RsaPrivateKey>,
+    Extension(pool): Extension<ConnectionPool>,
 ) -> Result<(HeaderMap, Redirect), CustomError> {
-    // TODO: Enforce Client Registration
-    // let d = std::str::from_utf8(
-    //     &jwk.decrypt(
-    //         PaddingScheme::new_pkcs1v15_encrypt(),
-    //         &params.client_id.as_bytes(),
-    //     )
-    //     .map_err(|e| anyhow!("Failed to decrypt client id: {}", e))?,
-    // )
-    // .map_err(|e| anyhow!("Failed to decrypt client id: {}", e))?
-    // if d != params.redirect_uri.as_str() {
-    //     return Err(anyhow!("Client id not composed of redirect url"));
-    // };
+    let conn = pool
+        .get()
+        .await
+        .map_err(|e| anyhow!("Failed to get connection to database: {}", e))?;
+    let client_entry = get_client(conn, params.client_id.clone())
+        .await
+        .map_err(|e| anyhow!("Failed to get kv: {}", e))?;
+    if client_entry.is_none() {
+        return Err(CustomError::Unauthorized(
+            "Unrecognised client id.".to_string(),
+        ));
+    }
+
+    let mut r_u = params.0.redirect_uri.clone().url().clone();
+    r_u.set_query(None);
+    let mut r_us: Vec<Url> = client_entry
+        .unwrap()
+        .redirect_uris
+        .iter_mut()
+        .map(|u| u.url().clone())
+        .collect();
+    r_us.iter_mut().for_each(|u| u.set_query(None));
+    if !r_us.contains(&r_u) {
+        return Ok((
+            HeaderMap::new(),
+            Redirect::to(
+                "/error?message=unregistered_request_uri"
+                    .parse()
+                    .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
+            ),
+        ));
+    }
+
+    let state = if let Some(s) = params.0.state.clone() {
+        s
+    } else if params.0.request_uri.is_some() {
+        let mut url = params.0.redirect_uri.url().clone();
+        url.query_pairs_mut().append_pair(
+            "error",
+            CoreAuthErrorResponseType::RequestUriNotSupported.as_ref(),
+        );
+        return Ok((
+            HeaderMap::new(),
+            Redirect::to(
+                url.as_str()
+                    .parse()
+                    .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
+            ),
+        ));
+    } else if params.0.request.is_some() {
+        let mut url = params.0.redirect_uri.url().clone();
+        url.query_pairs_mut().append_pair(
+            "error",
+            CoreAuthErrorResponseType::RequestNotSupported.as_ref(),
+        );
+        return Ok((
+            HeaderMap::new(),
+            Redirect::to(
+                url.as_str()
+                    .parse()
+                    .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
+            ),
+        ));
+    } else {
+        let mut url = params.redirect_uri.url().clone();
+        url.query_pairs_mut()
+            .append_pair("error", CoreAuthErrorResponseType::InvalidRequest.as_ref());
+        url.query_pairs_mut()
+            .append_pair("error_description", "Missing state");
+        return Ok((
+            HeaderMap::new(),
+            Redirect::to(
+                url.as_str()
+                    .parse()
+                    .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
+            ),
+        ));
+    };
+
+    if let Some(CoreAuthPrompt::None) = params.0.prompt {
+        let mut url = params.redirect_uri.url().clone();
+        url.query_pairs_mut().append_pair("state", &state);
+        url.query_pairs_mut().append_pair(
+            "error",
+            CoreAuthErrorResponseType::InteractionRequired.as_ref(),
+        );
+        return Ok((
+            HeaderMap::new(),
+            Redirect::to(
+                url.as_str()
+                    .parse()
+                    .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
+            ),
+        ));
+    }
+
+    if params.0.response_type.is_none() {
+        let mut url = params.redirect_uri.url().clone();
+        url.query_pairs_mut().append_pair("state", &state);
+        url.query_pairs_mut()
+            .append_pair("error", CoreAuthErrorResponseType::InvalidRequest.as_ref());
+        url.query_pairs_mut()
+            .append_pair("error_description", "Missing response_type");
+        return Ok((
+            HeaderMap::new(),
+            Redirect::to(
+                url.as_str()
+                    .parse()
+                    .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
+            ),
+        ));
+    }
+    let response_type = params.0.response_type.as_ref().unwrap();
 
     if params.scope != Scope::new("openid".to_string()) {
-        Err(anyhow!("Scope not supported"))?;
+        return Err(anyhow!("Scope not supported").into());
     }
 
     let (nonce, headers) = match session {
-        UserSessionFromSession::FoundUserSession(nonce) => (nonce, HeaderMap::new()),
-        UserSessionFromSession::InvalidUserSession(cookie) => {
+        UserSessionFromSession::Found(nonce) => (nonce, HeaderMap::new()),
+        UserSessionFromSession::Invalid(cookie) => {
             let mut headers = HeaderMap::new();
             headers.insert(header::SET_COOKIE, cookie);
             return Ok((
                 headers,
                 Redirect::to(
                     format!(
-"/authorize?client_id={}&redirect_uri={}&scope={}&response_type={}&state={}{}",
+"/authorize?client_id={}&redirect_uri={}&scope={}&response_type={}&state={}&client_id={}{}",
 &params.0.client_id,
 &params.0.redirect_uri.to_string(),
 &params.0.scope.to_string(),
-&params.0.response_type.as_ref(),
-&params.0.state,
-&params.0.nonce.map(|n| format!("&nonce={}", n.secret())).unwrap_or(String::new())
+&response_type.as_ref(),
+&state,
+&params.0.client_id,
+&params.0.nonce.map(|n| format!("&nonce={}", n.secret())).unwrap_or_default()
 )
-                    .to_string()
                     .parse()
                     .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
                 ),
             ));
         }
-        UserSessionFromSession::CreatedFreshUserSession { header, nonce } => {
+        UserSessionFromSession::Created { header, nonce } => {
             let mut headers = HeaderMap::new();
             headers.insert(header::SET_COOKIE, header);
             (nonce, headers)
@@ -346,11 +486,12 @@ async fn authorize(
         headers,
         Redirect::to(
             format!(
-                "/?nonce={}&domain={}&redirect_uri={}&state={}{}",
+                "/?nonce={}&domain={}&redirect_uri={}&state={}&client_id={}{}",
                 nonce,
                 domain,
                 params.redirect_uri.to_string(),
-                params.state,
+                state,
+                params.client_id,
                 oidc_nonce_param
             )
             .parse()
@@ -417,6 +558,7 @@ struct CodeEntry {
     exchange_count: usize,
     address: String,
     nonce: Option<Nonce>,
+    client_id: String,
 }
 
 #[derive(Deserialize)]
@@ -424,6 +566,7 @@ struct SignInParams {
     redirect_uri: RedirectUrl,
     state: String,
     oidc_nonce: Option<Nonce>,
+    client_id: String,
 }
 
 async fn sign_in(
@@ -438,39 +581,39 @@ async fn sign_in(
             &decode(c).map_err(|e| anyhow!("Could not decode siwe cookie: {}", e))?,
         )
         .map_err(|e| anyhow!("Could not deserialize siwe cookie: {}", e))?,
-        None => Err(anyhow!("No `siwe` cookie"))?,
+        None => {
+            return Err(anyhow!("No `siwe` cookie").into());
+        }
     };
 
     let (nonce, headers) = match session {
-        UserSessionFromSession::FoundUserSession(nonce) => (nonce, HeaderMap::new()),
-        UserSessionFromSession::InvalidUserSession(header) => {
+        UserSessionFromSession::Found(nonce) => (nonce, HeaderMap::new()),
+        UserSessionFromSession::Invalid(header) => {
             headers.insert(header::SET_COOKIE, header);
             return Ok((
                 headers,
                 Redirect::to(
                     format!(
     "/authorize?client_id={}&redirect_uri={}&scope=openid&response_type=code&state={}",
-    &params.0.redirect_uri.to_string(),
+    &params.0.client_id.clone(),
     &params.0.redirect_uri.to_string(),
 &params.0.state,
 )
-                    .to_string()
                     .parse()
                     .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
                 ),
             ));
         }
-        UserSessionFromSession::CreatedFreshUserSession { .. } => {
+        UserSessionFromSession::Created { .. } => {
             return Ok((
                 headers,
                 Redirect::to(
                     format!(
                 "/authorize?client_id={}&redirect_uri={}&scope=openid&response_type=code&state={}",
-                &params.0.redirect_uri.to_string(),
+                &params.0.client_id.clone(),
                 &params.0.redirect_uri.to_string(),
                 &params.0.state,
             )
-                    .to_string()
                     .parse()
                     .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
                 ),
@@ -484,11 +627,12 @@ async fn sign_in(
             .chars()
             .skip(2)
             .take(130)
-            .collect::<String>()
-            .clone(),
+            .collect::<String>(),
     ) {
         Ok(s) => s,
-        Err(e) => Err(CustomError::BadRequest(format!("Bad signature: {}", e)))?,
+        Err(e) => {
+            return Err(CustomError::BadRequest(format!("Bad signature: {}", e)));
+        }
     };
 
     let message = siwe_cookie
@@ -502,16 +646,17 @@ async fn sign_in(
 
     let domain = params.redirect_uri.url().host().unwrap();
     if domain.to_string() != siwe_cookie.message.domain {
-        Err(anyhow!("Conflicting domains in message and redirect"))?
+        return Err(anyhow!("Conflicting domains in message and redirect").into());
     }
     if nonce != siwe_cookie.message.nonce {
-        Err(anyhow!("Conflicting nonces in message and session"))?
+        return Err(anyhow!("Conflicting nonces in message and session").into());
     }
 
     let code_entry = CodeEntry {
         address: siwe_cookie.message.address,
         nonce: params.oidc_nonce.clone(),
         exchange_count: 0,
+        client_id: params.0.client_id.clone(),
     };
 
     let code = Uuid::new_v4();
@@ -547,25 +692,31 @@ async fn sign_in(
 async fn register(
     extract::Json(payload): extract::Json<CoreClientMetadata>,
     Extension(pool): Extension<ConnectionPool>,
-) -> Result<Json<CoreClientRegistrationResponse>, CustomError> {
+) -> Result<(StatusCode, Json<CoreClientRegistrationResponse>), CustomError> {
     let id = Uuid::new_v4();
     let secret = Uuid::new_v4();
 
-    let mut conn = pool
+    let conn = pool
         .get()
         .await
         .map_err(|e| anyhow!("Failed to get connection to database: {}", e))?;
-    conn.set(format!("{}/{}", KV_CLIENT_PREFIX, id), secret.to_string())
-        .await
-        .map_err(|e| anyhow!("Failed to set kv: {}", e))?;
+    let entry = ClientEntry {
+        secret: secret.to_string(),
+        redirect_uris: payload.redirect_uris().to_vec(),
+    };
+    set_client(conn, id.to_string(), entry).await?;
 
-    Ok(CoreClientRegistrationResponse::new(
-        ClientId::new(id.to_string()),
-        payload.redirect_uris().to_vec(),
-        EmptyAdditionalClientMetadata::default(),
-        EmptyAdditionalClientRegistrationResponse::default(),
-    )
-    .into())
+    Ok((
+        StatusCode::CREATED,
+        CoreClientRegistrationResponse::new(
+            ClientId::new(id.to_string()),
+            payload.redirect_uris().to_vec(),
+            EmptyAdditionalClientMetadata::default(),
+            EmptyAdditionalClientRegistrationResponse::default(),
+        )
+        .set_client_secret(Some(ClientSecret::new(secret.to_string())))
+        .into(),
+    ))
 }
 
 // TODO CORS
@@ -586,7 +737,7 @@ async fn userinfo(
         .await
         .map_err(|e| anyhow!("Failed to get kv: {}", e))?;
     if serialized_entry.is_none() {
-        Err(CustomError::BadRequest("Unknown code.".to_string()))?;
+        return Err(CustomError::BadRequest("Unknown code.".to_string()));
     }
     let code_entry: CodeEntry = bincode::deserialize(
         &hex::decode(serialized_entry.unwrap())
@@ -616,21 +767,23 @@ async fn main() {
     let pool = bb8::Pool::builder().build(manager.clone()).await.unwrap();
     let pool2 = bb8::Pool::builder().build(manager).await.unwrap();
 
-    let mut conn = pool2
-        .get()
-        .await
-        .map_err(|e| anyhow!("Failed to get connection to database: {}", e))
-        .unwrap();
     for (id, secret) in &config.default_clients.clone() {
-        let _: () = conn
-            .set(format!("{}/{}", KV_CLIENT_PREFIX, id), secret)
+        let conn = pool2
+            .get()
             .await
-            .map_err(|e| anyhow!("Failed to set kv: {}", e))
+            .map_err(|e| anyhow!("Failed to get connection to database: {}", e))
             .unwrap();
+        let client_entry = ClientEntry {
+            secret: secret.to_string(),
+            redirect_uris: vec![],
+        };
+        set_client(conn, id.to_string(), client_entry)
+            .await
+            .unwrap(); // TODO
     }
 
     let private_key = if let Some(key) = &config.rsa_pem {
-        RsaPrivateKey::from_pkcs1_pem(&key)
+        RsaPrivateKey::from_pkcs1_pem(key)
             .map_err(|e| anyhow!("Failed to load private key: {}", e))
             .unwrap()
     } else {
@@ -672,6 +825,17 @@ async fn main() {
         .route(
             "/",
             service_method_routing::get(ServeFile::new("./static/index.html")).handle_error(
+                |error: std::io::Error| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled internal error: {}", error),
+                    )
+                },
+            ),
+        )
+        .route(
+            "/error",
+            service_method_routing::get(ServeFile::new("./static/error.html")).handle_error(
                 |error: std::io::Error| {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,

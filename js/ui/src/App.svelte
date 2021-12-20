@@ -13,6 +13,7 @@
 	export let redirect: string;
 	export let state: string;
 	export let oidc_nonce: string;
+	export let client_id: string;
 
 	let uri: string = window.location.href.split('?')[0];
 
@@ -90,7 +91,7 @@
 	client.on('signIn', (result) => {
 		console.log(result);
 		window.location.replace(
-			`/sign_in?redirect_uri=${encodeURI(redirect)}&state=${encodeURI(state)}${encodeURI(oidc_nonce_param)}`,
+			`/sign_in?redirect_uri=${encodeURI(redirect)}&state=${encodeURI(state)}&client_id=${encodeURI(client_id)}${encodeURI(oidc_nonce_param)}`,
 		);
 	});
 </script>

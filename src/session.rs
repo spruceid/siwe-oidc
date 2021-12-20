@@ -15,9 +15,9 @@ const SESSION_COOKIE_NAME: &str = "session";
 const SESSION_KEY: &str = "user_session";
 
 pub enum UserSessionFromSession {
-    FoundUserSession(String),
-    CreatedFreshUserSession { header: HeaderValue, nonce: String },
-    InvalidUserSession(HeaderValue),
+    Found(String),
+    Created { header: HeaderValue, nonce: String },
+    Invalid(HeaderValue),
 }
 
 #[async_trait]
@@ -52,12 +52,11 @@ where
             .and_then(|value| value.to_str().ok())
             .map(|header| {
                 header
-                    .split(";")
+                    .split(';')
                     .map(|cookie| Cookie::parse(cookie).ok())
-                    .filter(|cookie| {
+                    .find(|cookie| {
                         cookie.is_some() && cookie.as_ref().unwrap().name() == SESSION_COOKIE_NAME
                     })
-                    .next()
             })
             .flatten()
             .flatten()
@@ -69,7 +68,7 @@ where
             session.insert(SESSION_KEY, user_session.clone()).unwrap();
             let cookie = store.store_session(session).await.unwrap().unwrap();
 
-            return Ok(Self::CreatedFreshUserSession {
+            return Ok(Self::Created {
                 header: Cookie::new(SESSION_COOKIE_NAME, cookie)
                     .to_string()
                     .parse()
@@ -84,9 +83,7 @@ where
                 debug!("Could not load session");
                 let mut cookie = session_cookie.clone();
                 cookie.make_removal();
-                return Ok(Self::InvalidUserSession(
-                    cookie.to_string().parse().unwrap(),
-                ));
+                return Ok(Self::Invalid(cookie.to_string().parse().unwrap()));
             }
         };
         let user_session = if let Some(user_session) = session.get::<UserSession>(SESSION_KEY) {
@@ -95,12 +92,10 @@ where
             debug!("No `user_session` found in session");
             let mut cookie = session_cookie.clone();
             cookie.make_removal();
-            return Ok(Self::InvalidUserSession(
-                cookie.to_string().parse().unwrap(),
-            ));
+            return Ok(Self::Invalid(cookie.to_string().parse().unwrap()));
         };
 
-        Ok(Self::FoundUserSession(user_session.nonce))
+        Ok(Self::Found(user_session.nonce))
     }
 }
 
