@@ -1,0 +1,22 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - *
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@master
+      - name: Build
+        run: cargo build --verbose
+      - name: Clippy
+        run: RUSTFLAGS="-Dwarnings" cargo clippy
+      - name: Fmt
+        run: cargo fmt -- --check
