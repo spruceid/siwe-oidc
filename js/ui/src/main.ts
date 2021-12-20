@@ -11,7 +11,8 @@ const app = new App({
 		nonce: params.get('nonce'),
 		redirect: params.get('redirect_uri'),
 		state: params.get('state'),
-		oidc_nonce: params.get('oidc_nonce')
+		oidc_nonce: params.get('oidc_nonce'),
+		client_id: params.get('client_id')
 	}
 });
 

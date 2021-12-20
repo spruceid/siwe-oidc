@@ -26,7 +26,7 @@ impl Default for Config {
             rsa_pem: None,
             redis_url: Url::parse("redis://localhost").unwrap(),
             default_clients: HashMap::default(),
-            require_secret: true,
+            require_secret: false,
         }
     }
 }
