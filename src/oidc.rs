@@ -24,11 +24,28 @@ use siwe::eip4361::{Message, Version};
 use std::str::FromStr;
 use thiserror::Error;
 use tracing::info;
+use urlencoding::decode;
 use uuid::Uuid;
 
+#[cfg(target_arch = "wasm32")]
 use super::db::*;
+#[cfg(not(target_arch = "wasm32"))]
+use siwe_oidc::db::*;
 
 const KID: &str = "key1";
+pub const METADATA_PATH: &str = "/.well-known/openid-configuration";
+pub const JWK_PATH: &str = "/jwk";
+pub const TOKEN_PATH: &str = "/token";
+pub const AUTHORIZE_PATH: &str = "/authorize";
+pub const REGISTER_PATH: &str = "/register";
+pub const USERINFO_PATH: &str = "/userinfo";
+pub const SIGNIN_PATH: &str = "/sign_in";
+pub const SIWE_COOKIE_KEY: &str = "siwe";
+
+#[cfg(not(target_arch = "wasm32"))]
+type DBClientType = (dyn DBClient + Sync);
+#[cfg(target_arch = "wasm32")]
+type DBClientType = dyn DBClient;
 
 #[derive(Serialize, Debug)]
 pub struct TokenError {
@@ -67,12 +84,12 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
         IssuerUrl::from_url(base_url.clone()),
         AuthUrl::from_url(
             base_url
-                .join("authorize")
+                .join(AUTHORIZE_PATH)
                 .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
         ),
         JsonWebKeySetUrl::from_url(
             base_url
-                .join("jwk")
+                .join(JWK_PATH)
                 .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
         ),
         vec![
@@ -85,12 +102,12 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
     )
     .set_token_endpoint(Some(TokenUrl::from_url(
         base_url
-            .join("token")
+            .join(TOKEN_PATH)
             .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
     )))
     .set_userinfo_endpoint(Some(UserInfoUrl::from_url(
         base_url
-            .join("userinfo")
+            .join(USERINFO_PATH)
             .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
     )))
     .set_scopes_supported(Some(vec![
@@ -114,7 +131,7 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
     ]))
     .set_registration_endpoint(Some(RegistrationUrl::from_url(
         base_url
-            .join("register")
+            .join(REGISTER_PATH)
             .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
     )))
     .set_token_endpoint_auth_methods_supported(Some(vec![
@@ -127,10 +144,10 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
 
 #[derive(Serialize, Deserialize)]
 pub struct TokenForm {
-    code: String,
-    client_id: Option<String>,
-    client_secret: Option<String>,
-    grant_type: CoreGrantType, // TODO should just be authorization_code apparently?
+    pub code: String,
+    pub client_id: Option<String>,
+    pub client_secret: Option<String>,
+    pub grant_type: CoreGrantType, // TODO should just be authorization_code apparently?
 }
 
 pub async fn token(
@@ -139,7 +156,7 @@ pub async fn token(
     private_key: RsaPrivateKey,
     base_url: Url,
     require_secret: bool,
-    db_client: &(dyn DBClient + Sync),
+    db_client: &DBClientType,
 ) -> Result<CoreTokenResponse, CustomError> {
     let code_entry = if let Some(c) = db_client.get_code(form.code.to_string()).await? {
         c
@@ -230,7 +247,7 @@ pub struct AuthorizeParams {
 pub async fn authorize(
     params: AuthorizeParams,
     nonce: String,
-    db_client: &(dyn DBClient + Sync),
+    db_client: &DBClientType,
 ) -> Result<String, CustomError> {
     let client_entry = db_client
         .get_client(params.client_id.clone())
@@ -348,7 +365,7 @@ struct Web3ModalMessage {
 }
 
 impl Web3ModalMessage {
-    pub fn to_eip4361_message(&self) -> Result<Message> {
+    fn to_eip4361_message(&self) -> Result<Message> {
         let mut next_resources: Vec<UriString> = Vec::new();
         match &self.resources {
             Some(resources) => {
@@ -387,10 +404,20 @@ pub struct SignInParams {
 
 pub async fn sign_in(
     params: SignInParams,
-    nonce: String,
-    siwe_cookie: SiweCookie,
-    db_client: &(dyn DBClient + Sync),
+    expected_nonce: Option<String>,
+    cookies: headers::Cookie,
+    db_client: &DBClientType,
 ) -> Result<Url, CustomError> {
+    let siwe_cookie: SiweCookie = match cookies.get(SIWE_COOKIE_KEY) {
+        Some(c) => serde_json::from_str(
+            &decode(c).map_err(|e| anyhow!("Could not decode siwe cookie: {}", e))?,
+        )
+        .map_err(|e| anyhow!("Could not deserialize siwe cookie: {}", e))?,
+        None => {
+            return Err(anyhow!("No `siwe` cookie").into());
+        }
+    };
+
     let signature = match <[u8; 65]>::from_hex(
         siwe_cookie
             .signature
@@ -418,7 +445,7 @@ pub async fn sign_in(
     if domain.to_string() != siwe_cookie.message.domain {
         return Err(anyhow!("Conflicting domains in message and redirect").into());
     }
-    if nonce != siwe_cookie.message.nonce {
+    if expected_nonce.is_some() && expected_nonce.unwrap() != siwe_cookie.message.nonce {
         return Err(anyhow!("Conflicting nonces in message and session").into());
     }
 
@@ -440,7 +467,7 @@ pub async fn sign_in(
 
 pub async fn register(
     payload: CoreClientMetadata,
-    db_client: &(dyn DBClient + Sync),
+    db_client: &DBClientType,
 ) -> Result<CoreClientRegistrationResponse, CustomError> {
     let id = Uuid::new_v4();
     let secret = Uuid::new_v4();
@@ -462,7 +489,7 @@ pub async fn register(
 
 pub async fn userinfo(
     bearer: Bearer,
-    db_client: &(dyn DBClient + Sync),
+    db_client: &DBClientType,
 ) -> Result<CoreUserInfoClaims, CustomError> {
     let code = bearer.token().to_string();
     let code_entry = if let Some(c) = db_client.get_code(code).await? {

@@ -3,9 +3,14 @@ use async_trait::async_trait;
 use openidconnect::{Nonce, RedirectUrl};
 use serde::{Deserialize, Serialize};
 
+#[cfg(not(target_arch = "wasm32"))]
 mod redis;
-
+#[cfg(not(target_arch = "wasm32"))]
 pub use redis::RedisClient;
+#[cfg(target_arch = "wasm32")]
+mod cf;
+#[cfg(target_arch = "wasm32")]
+pub use cf::CFClient;
 
 const KV_CLIENT_PREFIX: &str = "clients";
 const ENTRY_LIFETIME: usize = 30;
@@ -25,7 +30,8 @@ pub struct ClientEntry {
 }
 
 // Using a trait to easily pass async functions with async_trait
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait DBClient {
     async fn set_client(&self, client_id: String, client_entry: ClientEntry) -> Result<()>;
     async fn get_client(&self, client_id: String) -> Result<Option<ClientEntry>>;

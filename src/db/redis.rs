@@ -9,7 +9,8 @@ pub struct RedisClient {
     pub pool: Pool<RedisConnectionManager>,
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DBClient for RedisClient {
     async fn set_client(&self, client_id: String, client_entry: ClientEntry) -> Result<()> {
         let mut conn = self
