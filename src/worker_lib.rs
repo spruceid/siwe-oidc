@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use headers::{
     self,
-    authorization::{Bearer, Credentials},
+    authorization::{Basic, Bearer, Credentials},
     Authorization, Header, HeaderValue,
 };
 use rand::{distributions::Alphanumeric, Rng};
@@ -47,7 +47,8 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
         } else {
             return Response::error("Missing Bearer", 400);
         };
-        let db_client = CFClient { ctx };
+        let url = req.url()?;
+        let db_client = CFClient { ctx, url };
         match oidc::userinfo(bearer, &db_client).await {
             Ok(r) => Ok(Response::from_json(&r)?),
             Err(e) => e.into(),
@@ -97,17 +98,24 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
             } else {
                 return Response::error("Missing grant type", 400);
             };
-            let bearer = req
+            let secret = req
                 .headers()
                 .get(Authorization::<Bearer>::name().as_str())?
                 .and_then(|b| HeaderValue::from_str(b.as_ref()).ok())
                 .as_ref()
-                .and_then(Bearer::decode);
+                .and_then(|b| {
+                    if b.to_str().unwrap().starts_with("Bearer") {
+                        Bearer::decode(b).and_then(|bb| Some(bb.token().to_string()))
+                    } else {
+                        Basic::decode(b).and_then(|bb| Some(bb.password().to_string()))
+                    }
+                });
             let private_key = RsaPrivateKey::from_pkcs1_pem(&ctx.secret(RSA_PEM_KEY)?.to_string())
                 .map_err(|e| anyhow!("Failed to load private key: {}", e))
                 .unwrap();
             let base_url = ctx.var(BASE_URL_KEY)?.to_string().parse().unwrap();
-            let db_client = CFClient { ctx };
+            let url = req.url()?;
+            let db_client = CFClient { ctx, url };
             let token_response = oidc::token(
                 TokenForm {
                     code,
@@ -115,7 +123,7 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                     client_secret,
                     grant_type,
                 },
-                bearer,
+                secret,
                 private_key,
                 base_url,
                 false,
@@ -141,7 +149,8 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 .take(16)
                 .map(char::from)
                 .collect();
-            let db_client = CFClient { ctx };
+            let url = req.url()?;
+            let db_client = CFClient { ctx, url };
             match oidc::authorize(params, nonce, &db_client).await {
                 Ok(url) => Response::redirect(base_url.join(&url).unwrap()),
                 Err(e) => e.into(),
@@ -149,7 +158,8 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
         })
         .post_async(oidc::REGISTER_PATH, |mut req, ctx| async move {
             let payload = req.json().await?;
-            let db_client = CFClient { ctx };
+            let url = req.url()?;
+            let db_client = CFClient { ctx, url };
             match oidc::register(payload, &db_client).await {
                 Ok(r) => Ok(Response::from_json(&r)?.with_status(201)),
                 Err(e) => e.into(),
@@ -172,7 +182,8 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
             if cookies.is_none() {
                 return Response::error("Missing cookies", 400);
             }
-            let db_client = CFClient { ctx };
+            let url = req.url()?;
+            let db_client = CFClient { ctx, url };
             match oidc::sign_in(params, None, cookies.unwrap(), &db_client).await {
                 Ok(url) => Response::redirect(url),
                 Err(e) => e.into(),

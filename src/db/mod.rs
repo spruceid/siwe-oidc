@@ -13,11 +13,7 @@ mod cf;
 pub use cf::CFClient;
 
 const KV_CLIENT_PREFIX: &str = "clients";
-#[cfg(not(target_arch = "wasm32"))]
 const ENTRY_LIFETIME: usize = 30;
-#[cfg(target_arch = "wasm32")]
-const ENTRY_LIFETIME: usize = 60;
-// TTL of less than 60s is not supported yet, but the certification tests ask for 30s
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CodeEntry {

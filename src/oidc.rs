@@ -152,7 +152,8 @@ pub struct TokenForm {
 
 pub async fn token(
     form: TokenForm,
-    bearer: Option<Bearer>,
+    // From the request's Authorization header
+    secret: Option<String>,
     private_key: RsaPrivateKey,
     base_url: Url,
     require_secret: bool,
@@ -172,8 +173,8 @@ pub async fn token(
         code_entry.client_id.clone()
     };
 
-    if let Some(secret) = if let Some(b) = bearer {
-        Some(b.token().to_string())
+    if let Some(secret) = if let Some(b) = secret {
+        Some(b)
     } else {
         form.client_secret.clone()
     } {
