@@ -9,7 +9,7 @@ use rsa::{pkcs1::FromRsaPrivateKey, RsaPrivateKey};
 use worker::*;
 
 use super::db::CFClient;
-use super::oidc::{self, CustomError, TokenForm};
+use super::oidc::{self, CustomError, TokenForm, UserInfoPayload};
 
 const BASE_URL_KEY: &str = "BASE_URL";
 const RSA_PEM_KEY: &str = "RSA_PEM";
@@ -35,21 +35,31 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
     // tracing_subscriber::fmt::init();
     // console_log::init_with_level(log::Level::Info).expect("error initializing log");
 
-    let userinfo = |req: Request, ctx: RouteContext<()>| async move {
-        let bearer = if let Some(b) = req
+    let userinfo = |mut req: Request, ctx: RouteContext<()>| async move {
+        let bearer = req
             .headers()
             .get(Authorization::<Bearer>::name().as_str())?
             .and_then(|b| HeaderValue::from_str(b.as_ref()).ok())
             .as_ref()
-            .and_then(Bearer::decode)
-        {
-            b
+            .and_then(Bearer::decode);
+        let payload = if bearer.is_none() {
+            match req.form_data().await {
+                Ok(f) => {
+                    let access_token = if let Some(FormEntry::Field(a)) = f.get("access_token") {
+                        Some(a)
+                    } else {
+                        return Response::error("Missing code", 400);
+                    };
+                    UserInfoPayload { access_token }
+                }
+                Err(_) => return Response::error("Bad request", 400),
+            }
         } else {
-            return Response::error("Missing Bearer", 400);
+            UserInfoPayload { access_token: None }
         };
         let url = req.url()?;
         let db_client = CFClient { ctx, url };
-        match oidc::userinfo(bearer, &db_client).await {
+        match oidc::userinfo(bearer, payload, &db_client).await {
             Ok(r) => Ok(Response::from_json(&r)?),
             Err(e) => e.into(),
         }

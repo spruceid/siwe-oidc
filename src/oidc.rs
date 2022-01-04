@@ -488,11 +488,23 @@ pub async fn register(
     .set_client_secret(Some(ClientSecret::new(secret.to_string()))))
 }
 
+#[derive(Deserialize)]
+pub struct UserInfoPayload {
+    pub access_token: Option<String>,
+}
+
 pub async fn userinfo(
-    bearer: Bearer,
+    bearer: Option<Bearer>,
+    payload: UserInfoPayload,
     db_client: &DBClientType,
 ) -> Result<CoreUserInfoClaims, CustomError> {
-    let code = bearer.token().to_string();
+    let code = if let Some(b) = bearer {
+        b.token().to_string()
+    } else if let Some(c) = payload.access_token {
+        c
+    } else {
+        return Err(CustomError::BadRequest("Missing access token.".to_string()));
+    };
     let code_entry = if let Some(c) = db_client.get_code(code).await? {
         c
     } else {
