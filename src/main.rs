@@ -7,7 +7,7 @@ mod config;
 #[cfg(not(target_arch = "wasm32"))]
 mod session;
 #[cfg(not(target_arch = "wasm32"))]
-pub use axum_lib::main as axum_main;
+use axum_lib::main as axum_main;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]

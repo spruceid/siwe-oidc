@@ -5,53 +5,66 @@ edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/spruceid/siwe-oidc/"
+description = "OpenID Connect Identity Provider for Sign-In with Ethereum."
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1.0.51"
-chrono = "0.4.19"
 headers = "0.3.5"
 hex = "0.4.3"
 iri-string = { version = "0.4", features = ["serde-std"] }
-openidconnect = "2.1.2"
+# openidconnect = "2.1.2"
+openidconnect = { git = "https://github.com/sbihel/openidconnect-rs", branch = "main", default-features = false, features = ["reqwest", "rustls-tls", "rustcrypto"] }
 rand = "0.8.4"
 rsa = { version = "0.5.0", features = ["alloc"] }
-rust-argon2 = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.72"
 siwe = "0.1.2"
-async-session = "3.0.0"
 thiserror = "1.0.30"
 tracing = "0.1.29"
-tracing-subscriber = { version = "0.3.2", features = ["env-filter"] }
 url = { version = "2.2", features = ["serde"] }
 urlencoding = "2.1.0"
-figment = { version = "0.10.6", features = ["toml", "env"] }
 sha2 = "0.9.0"
 cookie = "0.15.1"
 bincode = "1.3.3"
 async-trait = "0.1.52"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+async-session = "3.0.0"
 axum = { version = "0.4.3", features = ["headers"] }
 # axum-debug = "0.3.2"
+chrono = "0.4.19"
+figment = { version = "0.10.6", features = ["toml", "env"] }
 tokio = { version = "1.14.0", features = ["full"] }
 tower-http = { version = "0.2.0", features = ["fs", "trace", "cors"] }
+tracing-subscriber = { version = "0.3.2", features = ["env-filter"] }
 bb8-redis = "0.10.1"
 async-redis-session = "0.2.2"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { version = "0.4.19", features = ["wasmbind"] }
 console_error_panic_hook = { version = "0.1" }
-tracing-wasm = "0.2"
+# console_log = "0.2"
+getrandom = { version = "0.2", features = ["js"] }
+# log = "0.4"
+serde_urlencoded = "0.7.0"
 uuid = { version = "0.8", features = ["serde", "v4", "wasm-bindgen"] }
 wee_alloc = { version = "0.4" }
 worker = "0.0.7"
 
-[target.'cfg(target_arch = "wasm32")'.profile.release]
+[profile.release]
 opt-level = "z"
+lto = true
+
+# [target.'cfg(target_arch = "wasm32")'.profile.release]
+# opt-level = "z"
+
+# [target.'cfg(target_arch = "wasm32")'.profile.debug]
+# opt-level = "z"
+# lto = false
 
 [package.metadata.wasm-pack.profile.profiling]
 wasm-opt = ['-g', '-O']

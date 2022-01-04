@@ -4,7 +4,7 @@ use worker::RouteContext;
 
 use super::*;
 
-const KV_NAMESPACE: &str = "blabla";
+const KV_NAMESPACE: &str = "SIWE-OIDC";
 
 pub struct CFClient {
     pub ctx: RouteContext<()>,
@@ -23,6 +23,7 @@ impl DBClient for CFClient {
                     .map_err(|e| anyhow!("Failed to serialize client entry: {}", e))?,
             )
             .map_err(|e| anyhow!("Failed to build KV put: {}", e))?
+            // TODO put some sort of expiration for dynamic registration
             .execute()
             .await
             .map_err(|e| anyhow!("Failed to put KV: {}", e))?;
