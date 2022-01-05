@@ -115,9 +115,9 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 .as_ref()
                 .and_then(|b| {
                     if b.to_str().unwrap().starts_with("Bearer") {
-                        Bearer::decode(b).and_then(|bb| Some(bb.token().to_string()))
+                        Bearer::decode(b).map(|bb| bb.token().to_string())
                     } else {
-                        Basic::decode(b).and_then(|bb| Some(bb.password().to_string()))
+                        Basic::decode(b).map(|bb| bb.password().to_string())
                     }
                 });
             let private_key = RsaPrivateKey::from_pkcs1_pem(&ctx.secret(RSA_PEM_KEY)?.to_string())
