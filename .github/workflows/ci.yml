@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Clone repo
         uses: actions/checkout@master
+      - name: Add targets
+        run: rustup target add wasm32-unknown-unknown
       - name: Build
         env:
           CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
