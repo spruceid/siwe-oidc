@@ -1,7 +1,7 @@
 name = "siwe_oidc"
 type = "javascript"
 account_id = ""
-zone_id = ""
+# zone_id = ""
 workers_dev = false
 compatibility_date = "2021-12-20"
 
