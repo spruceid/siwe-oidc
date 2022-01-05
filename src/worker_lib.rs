@@ -163,7 +163,13 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
             let db_client = CFClient { ctx, url };
             match oidc::authorize(params, nonce, &db_client).await {
                 Ok(url) => Response::redirect(base_url.join(&url).unwrap()),
-                Err(e) => e.into(),
+                Err(e) => match e {
+                    CustomError::Redirect(url) => {
+                        CustomError::Redirect(base_url.join(&url).unwrap().to_string())
+                    }
+                    c => c,
+                }
+                .into(),
             }
         })
         .post_async(oidc::REGISTER_PATH, |mut req, ctx| async move {

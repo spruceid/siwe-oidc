@@ -50,6 +50,7 @@ type DBClientType = dyn DBClient;
 #[derive(Serialize, Debug)]
 pub struct TokenError {
     pub error: CoreErrorResponseType,
+    pub error_description: String,
 }
 
 #[derive(Debug, Error)]
@@ -164,6 +165,7 @@ pub async fn token(
     } else {
         return Err(CustomError::BadRequestToken(TokenError {
             error: CoreErrorResponseType::InvalidGrant,
+            error_description: "Unknown code.".to_string(),
         }));
     };
 
@@ -193,7 +195,10 @@ pub async fn token(
 
     if code_entry.exchange_count > 0 {
         // TODO use Oauth error response
-        return Err(anyhow!("Code was previously exchanged.").into());
+        return Err(CustomError::BadRequestToken(TokenError {
+            error: CoreErrorResponseType::InvalidGrant,
+            error_description: "Code was previously exchanged.".to_string(),
+        }));
     }
     let mut code_entry2 = code_entry.clone();
     code_entry2.exchange_count += 1;
