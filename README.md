@@ -79,6 +79,7 @@ For the core OIDC information, it is available under
 * Additional information, from native projects (e.g. ENS domains), to more
   traditional ones (e.g. email).
 * PKCE support (code challenge).
+* Browser session support for the Worker version.
 
 ## Development
 
