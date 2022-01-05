@@ -324,7 +324,7 @@ pub async fn authorize(
             .append_pair("error_description", "Missing response_type");
         return Err(CustomError::Redirect(url.to_string()));
     }
-    let response_type = params.response_type.as_ref().unwrap();
+    let _response_type = params.response_type.as_ref().unwrap();
 
     if params.scope != Scope::new("openid".to_string()) {
         return Err(anyhow!("Scope not supported").into());

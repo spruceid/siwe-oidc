@@ -15,7 +15,11 @@ use figment::{
     providers::{Env, Format, Serialized, Toml},
     Figment,
 };
-use headers::{self, authorization::Bearer, Authorization};
+use headers::{
+    self,
+    authorization::{Basic, Bearer},
+    Authorization,
+};
 use openidconnect::core::{
     CoreClientMetadata, CoreClientRegistrationResponse, CoreJsonWebKeySet, CoreProviderMetadata,
     CoreResponseType, CoreTokenResponse, CoreUserInfoClaims,
@@ -32,10 +36,10 @@ use tower_http::{
 };
 use tracing::info;
 
-use ::siwe_oidc::db::*;
+use super::config;
 use super::oidc::{self, CustomError};
 use super::session::*;
-use super::config;
+use ::siwe_oidc::db::*;
 
 impl IntoResponse for CustomError {
     fn into_response(self) -> response::Response {
@@ -85,13 +89,19 @@ async fn provider_metadata(
 async fn token(
     Form(form): Form<oidc::TokenForm>,
     bearer: Option<TypedHeader<Authorization<Bearer>>>,
+    basic: Option<TypedHeader<Authorization<Basic>>>,
     Extension(private_key): Extension<RsaPrivateKey>,
     Extension(config): Extension<config::Config>,
     Extension(redis_client): Extension<RedisClient>,
 ) -> Result<Json<CoreTokenResponse>, CustomError> {
+    let secret = if let Some(b) = bearer {
+        Some(b.0 .0.token().to_string())
+    } else {
+        basic.map(|b| b.0 .0.password().to_string())
+    };
     let token_response = oidc::token(
         form,
-        bearer.map(|b| b.0 .0),
+        secret,
         private_key,
         config.base_url,
         config.require_secret,
@@ -213,13 +223,17 @@ async fn register(
 
 // TODO CORS
 // TODO need validation of the token
-// TODO restrict access token use to only once?
 async fn userinfo(
-    // access_token: AccessTokenUserInfo, // TODO maybe go through FromRequest https://github.com/tokio-rs/axum/blob/main/examples/jwt/src/main.rs
-    TypedHeader(Authorization(bearer)): TypedHeader<Authorization<Bearer>>, // TODO maybe go through FromRequest https://github.com/tokio-rs/axum/blob/main/examples/jwt/src/main.rs
+    payload: Option<Form<oidc::UserInfoPayload>>,
+    bearer: Option<TypedHeader<Authorization<Bearer>>>, // TODO maybe go through FromRequest https://github.com/tokio-rs/axum/blob/main/examples/jwt/src/main.rs
     Extension(redis_client): Extension<RedisClient>,
 ) -> Result<Json<CoreUserInfoClaims>, CustomError> {
-    let claims = oidc::userinfo(bearer, &redis_client).await?;
+    let payload = if let Some(Form(p)) = payload {
+        p
+    } else {
+        oidc::UserInfoPayload { access_token: None }
+    };
+    let claims = oidc::userinfo(bearer.map(|b| b.0 .0), payload, &redis_client).await?;
     Ok(claims.into())
 }
 
