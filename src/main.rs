@@ -1,9 +1,9 @@
 #[cfg(not(target_arch = "wasm32"))]
-mod oidc;
-#[cfg(not(target_arch = "wasm32"))]
 mod axum_lib;
 #[cfg(not(target_arch = "wasm32"))]
 mod config;
+#[cfg(not(target_arch = "wasm32"))]
+mod oidc;
 #[cfg(not(target_arch = "wasm32"))]
 mod session;
 #[cfg(not(target_arch = "wasm32"))]
@@ -16,5 +16,4 @@ async fn main() {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn main() {
-}
+fn main() {}
