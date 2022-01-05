@@ -11,19 +11,20 @@ jobs:
     strategy:
       matrix:
        include:
-         target: ["", "wasm32-unknown-unknown"]
+         - cargo_target: ""
+         - cargo_target: "wasm32-unknown-unknown"
     steps:
       - name: Clone repo
         uses: actions/checkout@master
       - name: Build
         env:
-          CARGO_BUILD_TARGET: ${{ matrix.target }}
+          CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
         run: cargo build --verbose
       - name: Clippy
         env:
-          CARGO_BUILD_TARGET: ${{ matrix.target }}
+          CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
         run: RUSTFLAGS="-Dwarnings" cargo clippy
       - name: Fmt
         env:
-          CARGO_BUILD_TARGET: ${{ matrix.target }}
+          CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
         run: cargo fmt -- --check
