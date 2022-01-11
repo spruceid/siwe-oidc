@@ -108,3 +108,9 @@ docker-compose up -d
 3. In Keycloak, you will need to create a new IdP. You can use
    `http://siwe-oidc:8000/.well-known/openid-configuration` to fill the settings
    automatically. As for the client ID/secret, you can use `sdf`/`sdf`.
+
+## Disclaimer
+
+Our identity provider for Sign-In with Ethereum has not yet undergone a formal
+security audit. We welcome continued feedback on the usability, architecture,
+and security of this implementation.
