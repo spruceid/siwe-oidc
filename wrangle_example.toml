@@ -1,0 +1,35 @@
+name = "siwe_oidc"
+type = "javascript"
+account_id = ""
+# zone_id = ""
+workers_dev = false
+compatibility_date = "2021-12-20"
+
+kv_namespaces = [
+    { binding = "SIWE-OIDC", id = "", preview_id = "" }
+]
+
+[vars]
+WORKERS_RS_VERSION = "0.0.7"
+BASE_URL = "https://siweoidc.spruceid.xyz"
+
+[durable_objects]
+bindings = [
+  { name = "SIWE-OIDC-CODES", class_name = "DOCodes" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["DOCodes"]
+
+[build]
+command = "cargo install -q worker-build && worker-build --release"
+
+[build.upload]
+dir    = "build/worker"
+format = "modules"
+main   = "./shim.mjs"
+
+[[build.upload.rules]]
+globs = ["**/*.wasm"]
+type  = "CompiledWasm"

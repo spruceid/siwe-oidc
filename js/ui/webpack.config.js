@@ -27,6 +27,7 @@ module.exports = {
 			path: false,
 			process: require.resolve('process/browser'),
 			stream: require.resolve('stream-browserify'),
+			url: require.resolve("url")
 			// util: false,
 		}
 	},

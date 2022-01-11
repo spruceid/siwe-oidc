@@ -8,12 +8,25 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+       include:
+         - cargo_target: "x86_64-unknown-linux-gnu"
+         - cargo_target: "wasm32-unknown-unknown"
     steps:
       - name: Clone repo
         uses: actions/checkout@master
+      - name: Add targets
+        run: rustup target add wasm32-unknown-unknown
       - name: Build
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
         run: cargo build --verbose
       - name: Clippy
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
         run: RUSTFLAGS="-Dwarnings" cargo clippy
       - name: Fmt
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
         run: cargo fmt -- --check
