@@ -98,7 +98,7 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
             ResponseTypes::new(vec![CoreResponseType::Token, CoreResponseType::IdToken]),
         ],
         vec![CoreSubjectIdentifierType::Pairwise],
-        vec![CoreJwsSigningAlgorithm::RsaSsaPssSha256],
+        vec![CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256],
         EmptyAdditionalProviderMetadata {},
     )
     .set_token_endpoint(Some(TokenUrl::from_url(
