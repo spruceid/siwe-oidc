@@ -214,7 +214,8 @@ pub async fn token(
         StandardClaims::new(SubjectIdentifier::new(code_entry.address)),
         EmptyAdditionalClaims {},
     )
-    .set_nonce(code_entry.nonce);
+    .set_nonce(code_entry.nonce)
+    .set_auth_time(Some(code_entry.auth_time));
 
     let pem = private_key
         .to_pkcs1_pem()
@@ -460,6 +461,7 @@ pub async fn sign_in(
         nonce: params.oidc_nonce.clone(),
         exchange_count: 0,
         client_id: params.client_id.clone(),
+        auth_time: chrono::offset::Utc::now(),
     };
 
     let code = Uuid::new_v4();

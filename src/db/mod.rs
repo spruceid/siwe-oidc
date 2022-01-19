@@ -1,5 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::{offset::Utc, DateTime};
 use openidconnect::{Nonce, RedirectUrl};
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +22,7 @@ pub struct CodeEntry {
     pub address: String,
     pub nonce: Option<Nonce>,
     pub client_id: String,
+    pub auth_time: DateTime<Utc>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
