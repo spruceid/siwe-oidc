@@ -47,6 +47,9 @@ impl IntoResponse for CustomError {
             CustomError::BadRequest(_) => {
                 (StatusCode::BAD_REQUEST, self.to_string()).into_response()
             }
+            CustomError::BadRequestRegister(e) => {
+                (StatusCode::BAD_REQUEST, Json::from(e)).into_response()
+            }
             CustomError::BadRequestToken(e) => {
                 (StatusCode::BAD_REQUEST, Json::from(e)).into_response()
             }

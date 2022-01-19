@@ -8,9 +8,9 @@ use openidconnect::{
         CoreAuthErrorResponseType, CoreAuthPrompt, CoreClaimName, CoreClientAuthMethod,
         CoreClientMetadata, CoreClientRegistrationResponse, CoreErrorResponseType, CoreGrantType,
         CoreIdToken, CoreIdTokenClaims, CoreIdTokenFields, CoreJsonWebKeySet,
-        CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseType, CoreRsaPrivateSigningKey,
-        CoreSubjectIdentifierType, CoreTokenResponse, CoreTokenType, CoreUserInfoClaims,
-        CoreUserInfoJsonWebToken,
+        CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreRegisterErrorResponseType,
+        CoreResponseType, CoreRsaPrivateSigningKey, CoreSubjectIdentifierType, CoreTokenResponse,
+        CoreTokenType, CoreUserInfoClaims, CoreUserInfoJsonWebToken,
     },
     registration::{EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse},
     url::Url,
@@ -59,6 +59,8 @@ pub struct TokenError {
 pub enum CustomError {
     #[error("{0}")]
     BadRequest(String),
+    #[error("{0:?}")]
+    BadRequestRegister(RegisterError),
     #[error("{0:?}")]
     BadRequestToken(TokenError),
     #[error("{0}")]
@@ -479,6 +481,11 @@ pub async fn sign_in(
     Ok(url)
 }
 
+#[derive(Debug, Serialize)]
+pub struct RegisterError {
+    error: CoreRegisterErrorResponseType,
+}
+
 pub async fn register(
     payload: CoreClientMetadata,
     db_client: &DBClientType,
@@ -487,6 +494,13 @@ pub async fn register(
     let secret = Uuid::new_v4();
 
     let redirect_uris = payload.redirect_uris().to_vec();
+    for uri in redirect_uris.iter() {
+        if uri.url().fragment().is_some() {
+            return Err(CustomError::BadRequestRegister(RegisterError {
+                error: CoreRegisterErrorResponseType::InvalidRedirectUri,
+            }));
+        }
+    }
 
     let entry = ClientEntry {
         secret: secret.to_string(),

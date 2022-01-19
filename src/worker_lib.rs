@@ -22,6 +22,9 @@ impl From<CustomError> for Result<Response> {
     fn from(error: CustomError) -> Self {
         match error {
             CustomError::BadRequest(_) => Response::error(&error.to_string(), 400),
+            CustomError::BadRequestRegister(e) => {
+                Response::from_json(&e).map(|r| r.with_status(400))
+            }
             CustomError::BadRequestToken(e) => Response::from_json(&e).map(|r| r.with_status(400)),
             CustomError::Unauthorized(_) => Response::error(&error.to_string(), 401),
             CustomError::Redirect(uri) => Response::redirect(uri.parse().unwrap()),
