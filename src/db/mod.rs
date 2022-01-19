@@ -14,7 +14,7 @@ mod cf;
 pub use cf::CFClient;
 
 const KV_CLIENT_PREFIX: &str = "clients";
-const ENTRY_LIFETIME: usize = 30;
+pub const ENTRY_LIFETIME: usize = 30;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CodeEntry {

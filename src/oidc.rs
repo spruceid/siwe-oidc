@@ -21,7 +21,7 @@ use openidconnect::{
 use rsa::{pkcs1::ToRsaPrivateKey, RsaPrivateKey};
 use serde::{Deserialize, Serialize};
 use siwe::eip4361::{Message, Version};
-use std::str::FromStr;
+use std::{str::FromStr, time};
 use thiserror::Error;
 use tracing::info;
 use urlencoding::decode;
@@ -231,11 +231,15 @@ pub async fn token(
     )
     .map_err(|e| anyhow!("{}", e))?;
 
-    Ok(CoreTokenResponse::new(
+    let mut response = CoreTokenResponse::new(
         access_token,
         CoreTokenType::Bearer,
         CoreIdTokenFields::new(Some(id_token), EmptyExtraTokenFields {}),
-    ))
+    );
+    response.set_expires_in(Some(&time::Duration::from_secs(
+        ENTRY_LIFETIME.try_into().unwrap(),
+    )));
+    Ok(response)
 }
 
 #[derive(Deserialize)]
@@ -461,7 +465,7 @@ pub async fn sign_in(
         nonce: params.oidc_nonce.clone(),
         exchange_count: 0,
         client_id: params.client_id.clone(),
-        auth_time: chrono::offset::Utc::now(),
+        auth_time: Utc::now(),
     };
 
     let code = Uuid::new_v4();
