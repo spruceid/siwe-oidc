@@ -10,6 +10,7 @@ use openidconnect::{
         CoreIdToken, CoreIdTokenClaims, CoreIdTokenFields, CoreJsonWebKeySet,
         CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreResponseType, CoreRsaPrivateSigningKey,
         CoreSubjectIdentifierType, CoreTokenResponse, CoreTokenType, CoreUserInfoClaims,
+        CoreUserInfoJsonWebToken,
     },
     registration::{EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse},
     url::Url,
@@ -32,6 +33,7 @@ use super::db::*;
 #[cfg(not(target_arch = "wasm32"))]
 use siwe_oidc::db::*;
 
+const SIGNING_ALG: [CoreJwsSigningAlgorithm; 1] = [CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256];
 const KID: &str = "key1";
 pub const METADATA_PATH: &str = "/.well-known/openid-configuration";
 pub const JWK_PATH: &str = "/jwk";
@@ -67,16 +69,17 @@ pub enum CustomError {
     Other(#[from] anyhow::Error),
 }
 
-pub fn jwks(private_key: RsaPrivateKey) -> Result<CoreJsonWebKeySet, CustomError> {
+fn jwk(private_key: RsaPrivateKey) -> Result<CoreRsaPrivateSigningKey> {
     let pem = private_key
         .to_pkcs1_pem()
         .map_err(|e| anyhow!("Failed to serialise key as PEM: {}", e))?;
-    let jwks = CoreJsonWebKeySet::new(vec![CoreRsaPrivateSigningKey::from_pem(
-        &pem,
-        Some(JsonWebKeyId::new(KID.to_string())),
-    )
-    .map_err(|e| anyhow!("Invalid RSA private key: {}", e))?
-    .as_verification_key()]);
+    CoreRsaPrivateSigningKey::from_pem(&pem, Some(JsonWebKeyId::new(KID.to_string())))
+        .map_err(|e| anyhow!("Invalid RSA private key: {}", e))
+}
+
+pub fn jwks(private_key: RsaPrivateKey) -> Result<CoreJsonWebKeySet, CustomError> {
+    let signing_key = jwk(private_key)?;
+    let jwks = CoreJsonWebKeySet::new(vec![signing_key.as_verification_key()]);
     Ok(jwks)
 }
 
@@ -98,7 +101,7 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
             ResponseTypes::new(vec![CoreResponseType::Token, CoreResponseType::IdToken]),
         ],
         vec![CoreSubjectIdentifierType::Pairwise],
-        vec![CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256],
+        SIGNING_ALG.to_vec(),
         EmptyAdditionalProviderMetadata {},
     )
     .set_token_endpoint(Some(TokenUrl::from_url(
@@ -111,6 +114,7 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
             .join(USERINFO_PATH)
             .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
     )))
+    .set_userinfo_signing_alg_values_supported(Some(SIGNING_ALG.to_vec()))
     .set_scopes_supported(Some(vec![
         Scope::new("openid".to_string()),
         // Scope::new("email".to_string()),
@@ -138,6 +142,7 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
     .set_token_endpoint_auth_methods_supported(Some(vec![
         CoreClientAuthMethod::ClientSecretBasic,
         CoreClientAuthMethod::ClientSecretPost,
+        CoreClientAuthMethod::PrivateKeyJwt,
     ]));
 
     Ok(pm)
@@ -274,7 +279,9 @@ pub async fn authorize(
     r_u.set_query(None);
     let mut r_us: Vec<Url> = client_entry
         .unwrap()
-        .redirect_uris
+        .metadata
+        .redirect_uris()
+        .clone()
         .iter_mut()
         .map(|u| u.url().clone())
         .collect();
@@ -343,12 +350,7 @@ pub async fn authorize(
     };
     Ok(format!(
         "/?nonce={}&domain={}&redirect_uri={}&state={}&client_id={}{}",
-        nonce,
-        domain,
-        params.redirect_uri.to_string(),
-        state,
-        params.client_id,
-        oidc_nonce_param
+        nonce, domain, *params.redirect_uri, state, params.client_id, oidc_nonce_param
     ))
 }
 
@@ -484,15 +486,17 @@ pub async fn register(
     let id = Uuid::new_v4();
     let secret = Uuid::new_v4();
 
+    let redirect_uris = payload.redirect_uris().to_vec();
+
     let entry = ClientEntry {
         secret: secret.to_string(),
-        redirect_uris: payload.redirect_uris().to_vec(),
+        metadata: payload,
     };
     db_client.set_client(id.to_string(), entry).await?;
 
     Ok(CoreClientRegistrationResponse::new(
         ClientId::new(id.to_string()),
-        payload.redirect_uris().to_vec(),
+        redirect_uris,
         EmptyAdditionalClientMetadata::default(),
         EmptyAdditionalClientRegistrationResponse::default(),
     )
@@ -504,11 +508,18 @@ pub struct UserInfoPayload {
     pub access_token: Option<String>,
 }
 
+pub enum UserInfoResponse {
+    Json(CoreUserInfoClaims),
+    Jwt(CoreUserInfoJsonWebToken),
+}
+
 pub async fn userinfo(
+    base_url: Url,
+    private_key: RsaPrivateKey,
     bearer: Option<Bearer>,
     payload: UserInfoPayload,
     db_client: &DBClientType,
-) -> Result<CoreUserInfoClaims, CustomError> {
+) -> Result<UserInfoResponse, CustomError> {
     let code = if let Some(b) = bearer {
         b.token().to_string()
     } else if let Some(c) = payload.access_token {
@@ -522,8 +533,26 @@ pub async fn userinfo(
         return Err(CustomError::BadRequest("Unknown code.".to_string()));
     };
 
-    Ok(CoreUserInfoClaims::new(
+    let client_entry = if let Some(c) = db_client.get_client(code_entry.client_id.clone()).await? {
+        c
+    } else {
+        return Err(CustomError::BadRequest("Unknown client.".to_string()));
+    };
+
+    let response = CoreUserInfoClaims::new(
         StandardClaims::new(SubjectIdentifier::new(code_entry.address)),
         EmptyAdditionalClaims::default(),
-    ))
+    )
+    .set_issuer(Some(IssuerUrl::from_url(base_url.clone())))
+    .set_audiences(Some(vec![Audience::new(code_entry.client_id)]));
+    match client_entry.metadata.userinfo_signed_response_alg() {
+        None => Ok(UserInfoResponse::Json(response)),
+        Some(alg) => {
+            let signing_key = jwk(private_key)?;
+            Ok(UserInfoResponse::Jwt(
+                CoreUserInfoJsonWebToken::new(response, &signing_key, alg.clone())
+                    .map_err(|_| anyhow!("Error signing response."))?,
+            ))
+        }
+    }
 }

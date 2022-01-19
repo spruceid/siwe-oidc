@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{offset::Utc, DateTime};
-use openidconnect::{Nonce, RedirectUrl};
+use openidconnect::{core::CoreClientMetadata, Nonce};
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -28,7 +28,7 @@ pub struct CodeEntry {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ClientEntry {
     pub secret: String,
-    pub redirect_uris: Vec<RedirectUrl>,
+    pub metadata: CoreClientMetadata,
 }
 
 // Using a trait to easily pass async functions with async_trait

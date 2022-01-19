@@ -18,11 +18,11 @@ use figment::{
 use headers::{
     self,
     authorization::{Basic, Bearer},
-    Authorization,
+    Authorization, ContentType, Header,
 };
 use openidconnect::core::{
     CoreClientMetadata, CoreClientRegistrationResponse, CoreJsonWebKeySet, CoreProviderMetadata,
-    CoreResponseType, CoreTokenResponse, CoreUserInfoClaims,
+    CoreResponseType, CoreTokenResponse, CoreUserInfoClaims, CoreUserInfoJsonWebToken,
 };
 use rand::rngs::OsRng;
 use rsa::{
@@ -221,20 +221,64 @@ async fn register(
     Ok((StatusCode::CREATED, registration.into()))
 }
 
+struct UserInfoResponseJWT(Json<CoreUserInfoJsonWebToken>);
+
+impl IntoResponse for UserInfoResponseJWT {
+    fn into_response(self) -> response::Response {
+        response::Response::builder()
+            .status(StatusCode::OK)
+            .header(ContentType::name(), "application/jwt")
+            .body(
+                serde_json::to_string(&self.0 .0)
+                    .unwrap()
+                    .replace('"', "")
+                    .into_response()
+                    .into_body(),
+            )
+            .unwrap()
+    }
+}
+
+enum UserInfoResponse {
+    Json(Json<CoreUserInfoClaims>),
+    Jwt(UserInfoResponseJWT),
+}
+
+impl IntoResponse for UserInfoResponse {
+    fn into_response(self) -> response::Response {
+        match self {
+            UserInfoResponse::Json(j) => j.into_response(),
+            UserInfoResponse::Jwt(j) => j.into_response(),
+        }
+    }
+}
+
 // TODO CORS
 // TODO need validation of the token
 async fn userinfo(
+    Extension(private_key): Extension<RsaPrivateKey>,
+    Extension(config): Extension<config::Config>,
     payload: Option<Form<oidc::UserInfoPayload>>,
     bearer: Option<TypedHeader<Authorization<Bearer>>>, // TODO maybe go through FromRequest https://github.com/tokio-rs/axum/blob/main/examples/jwt/src/main.rs
     Extension(redis_client): Extension<RedisClient>,
-) -> Result<Json<CoreUserInfoClaims>, CustomError> {
+) -> Result<UserInfoResponse, CustomError> {
     let payload = if let Some(Form(p)) = payload {
         p
     } else {
         oidc::UserInfoPayload { access_token: None }
     };
-    let claims = oidc::userinfo(bearer.map(|b| b.0 .0), payload, &redis_client).await?;
-    Ok(claims.into())
+    let claims = oidc::userinfo(
+        config.base_url,
+        private_key,
+        bearer.map(|b| b.0 .0),
+        payload,
+        &redis_client,
+    )
+    .await?;
+    Ok(match claims {
+        oidc::UserInfoResponse::Json(c) => UserInfoResponse::Json(c.into()),
+        oidc::UserInfoResponse::Jwt(c) => UserInfoResponse::Jwt(UserInfoResponseJWT(c.into())),
+    })
 }
 
 async fn healthcheck() {}
@@ -253,16 +297,16 @@ pub async fn main() {
 
     let redis_client = RedisClient { pool };
 
-    for (id, secret) in &config.default_clients.clone() {
-        let client_entry = ClientEntry {
-            secret: secret.to_string(),
-            redirect_uris: vec![],
-        };
-        redis_client
-            .set_client(id.to_string(), client_entry)
-            .await
-            .unwrap(); // TODO
-    }
+    // for (id, secret) in &config.default_clients.clone() {
+    //     let client_entry = ClientEntry {
+    //         secret: secret.to_string(),
+    //         redirect_uris: vec![],
+    //     };
+    //     redis_client
+    //         .set_client(id.to_string(), client_entry)
+    //         .await
+    //         .unwrap(); // TODO
+    // }
 
     let private_key = if let Some(key) = &config.rsa_pem {
         RsaPrivateKey::from_pkcs1_pem(key)

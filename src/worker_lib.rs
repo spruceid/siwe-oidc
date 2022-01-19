@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use headers::{
     self,
     authorization::{Basic, Bearer, Credentials},
-    Authorization, Header, HeaderValue,
+    Authorization, ContentType, Header, HeaderValue,
 };
 use rand::{distributions::Alphanumeric, Rng};
 use rsa::{pkcs1::FromRsaPrivateKey, RsaPrivateKey};
@@ -57,10 +57,26 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
         } else {
             UserInfoPayload { access_token: None }
         };
+        let base_url = ctx.var(BASE_URL_KEY)?.to_string().parse().unwrap();
+        let private_key = RsaPrivateKey::from_pkcs1_pem(&ctx.secret(RSA_PEM_KEY)?.to_string())
+            .map_err(|e| anyhow!("Failed to load private key: {}", e))
+            .unwrap();
         let url = req.url()?;
         let db_client = CFClient { ctx, url };
-        match oidc::userinfo(bearer, payload, &db_client).await {
-            Ok(r) => Ok(Response::from_json(&r)?),
+        match oidc::userinfo(base_url, private_key, bearer, payload, &db_client).await {
+            Ok(oidc::UserInfoResponse::Json(r)) => Ok(Response::from_json(&r)?),
+            Ok(oidc::UserInfoResponse::Jwt(r)) => {
+                let mut headers = Headers::new();
+                headers.append(&ContentType::name().to_string(), "application/jwt")?;
+                Ok(Response::from_bytes(
+                    serde_json::to_string(&r)
+                        .unwrap()
+                        .replace('"', "")
+                        .as_bytes()
+                        .to_vec(),
+                )?
+                .with_headers(headers))
+            }
             Err(e) => e.into(),
         }
     };
