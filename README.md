@@ -69,16 +69,22 @@ through environment variables:
 ### OIDC Functionalities
 
 The current flow is very basic -- after the user is authenticated you will
-receive an Ethereum address as the subject (`sub` field).
+receive:
+- an Ethereum address as the subject (`sub` field); and
+- an ENS domain as the `preferred_username` (with a fallback to the address).
 
 For the core OIDC information, it is available under
 `/.well-known/openid-configuration`.
 
+OIDC Conformance Suite:
+- 🟨 (25/29, and 10 skipped) [basic](https://www.certification.openid.net/plan-detail.html?plan=gXe7Ju1O1afZa&public=true) (`email` scope skipped,  `profile` scope partially supported, ACR, `prompt=none` and request URIs yet to be supported);
+- 🟩 [config](https://www.certification.openid.net/plan-detail.html?plan=SAmBjvtyfTDVn&public=true);
+- 🟧 [dynamic code](https://www.certification.openid.net/plan-detail.html?plan=7rexGcCd4SWJa&public=true).
+
 ### TODO Items
 
-* Additional information, from native projects (e.g. ENS domains), to more
-  traditional ones (e.g. email).
-* PKCE support (code challenge).
+* Additional information, from native projects (e.g. ENS domains profile
+  pictures), to more traditional ones (e.g. email).
 * Browser session support for the Worker version.
 
 ## Development

@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
+use ethers_core::{types::H160, utils::to_checksum};
 use headers::{self, authorization::Bearer};
 use hex::FromHex;
 use iri_string::types::UriString;
@@ -15,16 +16,16 @@ use openidconnect::{
     registration::{EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse},
     url::Url,
     AccessToken, Audience, AuthUrl, ClientId, ClientSecret, EmptyAdditionalClaims,
-    EmptyAdditionalProviderMetadata, EmptyExtraTokenFields, IssuerUrl, JsonWebKeyId,
-    JsonWebKeySetUrl, Nonce, PrivateSigningKey, RedirectUrl, RegistrationUrl, RequestUrl,
-    ResponseTypes, Scope, StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
+    EmptyAdditionalProviderMetadata, EmptyExtraTokenFields, EndUserUsername, IssuerUrl,
+    JsonWebKeyId, JsonWebKeySetUrl, Nonce, PrivateSigningKey, RedirectUrl, RegistrationUrl,
+    RequestUrl, ResponseTypes, Scope, StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
 };
 use rsa::{pkcs1::ToRsaPrivateKey, RsaPrivateKey};
 use serde::{Deserialize, Serialize};
 use siwe::eip4361::{Message, Version};
 use std::{str::FromStr, time};
 use thiserror::Error;
-use tracing::info;
+use tracing::{error, info};
 use urlencoding::decode;
 use uuid::Uuid;
 
@@ -33,6 +34,12 @@ use super::db::*;
 #[cfg(not(target_arch = "wasm32"))]
 use siwe_oidc::db::*;
 
+lazy_static::lazy_static! {
+    static ref SCOPES: [Scope; 2] = [
+        Scope::new("openid".to_string()),
+        Scope::new("profile".to_string()),
+    ];
+}
 const SIGNING_ALG: [CoreJwsSigningAlgorithm; 1] = [CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256];
 const KID: &str = "key1";
 pub const METADATA_PATH: &str = "/.well-known/openid-configuration";
@@ -100,6 +107,7 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
         ),
         vec![
             ResponseTypes::new(vec![CoreResponseType::Code]),
+            ResponseTypes::new(vec![CoreResponseType::IdToken]),
             ResponseTypes::new(vec![CoreResponseType::Token, CoreResponseType::IdToken]),
         ],
         vec![CoreSubjectIdentifierType::Pairwise],
@@ -117,24 +125,14 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
             .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
     )))
     .set_userinfo_signing_alg_values_supported(Some(SIGNING_ALG.to_vec()))
-    .set_scopes_supported(Some(vec![
-        Scope::new("openid".to_string()),
-        // Scope::new("email".to_string()),
-        // Scope::new("profile".to_string()),
-    ]))
+    .set_scopes_supported(Some(SCOPES.to_vec()))
     .set_claims_supported(Some(vec![
         CoreClaimName::new("sub".to_string()),
         CoreClaimName::new("aud".to_string()),
-        // CoreClaimName::new("email".to_string()),
-        // CoreClaimName::new("email_verified".to_string()),
         CoreClaimName::new("exp".to_string()),
         CoreClaimName::new("iat".to_string()),
         CoreClaimName::new("iss".to_string()),
-        // CoreClaimName::new("name".to_string()),
-        // CoreClaimName::new("given_name".to_string()),
-        // CoreClaimName::new("family_name".to_string()),
-        // CoreClaimName::new("picture".to_string()),
-        // CoreClaimName::new("locale".to_string()),
+        CoreClaimName::new("preferred_username".to_string()),
     ]))
     .set_registration_endpoint(Some(RegistrationUrl::from_url(
         base_url
@@ -148,6 +146,29 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
     ]));
 
     Ok(pm)
+}
+
+async fn resolve_name(eth_provider: Option<Url>, address: H160) -> String {
+    let address_string = to_checksum(&address, None);
+    if eth_provider.is_none() {
+        return address_string;
+    }
+
+    use ethers_providers::{Http, Middleware, Provider};
+    let provider = match Provider::<Http>::try_from(eth_provider.unwrap().to_string()) {
+        Ok(p) => p,
+        Err(e) => {
+            error!("Failed to initialise Eth provider: {}", e);
+            return address_string;
+        }
+    };
+    match provider.lookup_address(address).await {
+        Ok(n) => n,
+        Err(e) => {
+            error!("Failed to resolve Eth domain: {}", e);
+            address_string
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -165,6 +186,7 @@ pub async fn token(
     private_key: RsaPrivateKey,
     base_url: Url,
     require_secret: bool,
+    eth_provider: Option<Url>,
     db_client: &DBClientType,
 ) -> Result<CoreTokenResponse, CustomError> {
     let code_entry = if let Some(c) = db_client.get_code(form.code.to_string()).await? {
@@ -218,7 +240,13 @@ pub async fn token(
         vec![Audience::new(client_id.clone())],
         Utc::now() + Duration::seconds(60),
         Utc::now(),
-        StandardClaims::new(SubjectIdentifier::new(code_entry.address)),
+        StandardClaims::new(SubjectIdentifier::new(to_checksum(
+            &code_entry.address,
+            None,
+        )))
+        .set_preferred_username(Some(EndUserUsername::new(
+            resolve_name(eth_provider, code_entry.address).await,
+        ))),
         EmptyAdditionalClaims {},
     )
     .set_nonce(code_entry.nonce)
@@ -340,8 +368,10 @@ pub async fn authorize(
     }
     let _response_type = params.response_type.as_ref().unwrap();
 
-    if params.scope != Scope::new("openid".to_string()) {
-        return Err(anyhow!("Scope not supported").into());
+    for scope in params.scope.as_str().split(' ') {
+        if !SCOPES.contains(&Scope::new(scope.to_string())) {
+            return Err(anyhow!("Scope not supported: {}", scope).into());
+        }
     }
 
     let domain = params.redirect_uri.url().host().unwrap();
@@ -366,7 +396,7 @@ pub struct SiweCookie {
 #[serde(rename_all = "camelCase")]
 struct Web3ModalMessage {
     pub domain: String,
-    pub address: String,
+    pub address: H160,
     pub statement: String,
     pub uri: String,
     pub version: String,
@@ -394,7 +424,7 @@ impl Web3ModalMessage {
 
         Ok(Message {
             domain: self.domain.clone().try_into()?,
-            address: <[u8; 20]>::from_hex(self.address.chars().skip(2).collect::<String>())?,
+            address: self.address.0,
             statement: self.statement.to_string(),
             uri: UriString::from_str(&self.uri)?,
             version: Version::from_str(&self.version)?,
@@ -529,6 +559,7 @@ pub enum UserInfoResponse {
 
 pub async fn userinfo(
     base_url: Url,
+    eth_provider: Option<Url>,
     private_key: RsaPrivateKey,
     bearer: Option<Bearer>,
     payload: UserInfoPayload,
@@ -554,7 +585,13 @@ pub async fn userinfo(
     };
 
     let response = CoreUserInfoClaims::new(
-        StandardClaims::new(SubjectIdentifier::new(code_entry.address)),
+        StandardClaims::new(SubjectIdentifier::new(to_checksum(
+            &code_entry.address,
+            None,
+        )))
+        .set_preferred_username(Some(EndUserUsername::new(
+            resolve_name(eth_provider, code_entry.address).await,
+        ))),
         EmptyAdditionalClaims::default(),
     )
     .set_issuer(Some(IssuerUrl::from_url(base_url.clone())))

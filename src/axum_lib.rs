@@ -108,6 +108,7 @@ async fn token(
         private_key,
         config.base_url,
         config.require_secret,
+        config.eth_provider,
         &redis_client,
     )
     .await?;
@@ -272,6 +273,7 @@ async fn userinfo(
     };
     let claims = oidc::userinfo(
         config.base_url,
+        config.eth_provider,
         private_key,
         bearer.map(|b| b.0 .0),
         payload,

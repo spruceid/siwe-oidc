@@ -12,6 +12,7 @@ use super::db::CFClient;
 use super::oidc::{self, CustomError, TokenForm, UserInfoPayload};
 
 const BASE_URL_KEY: &str = "BASE_URL";
+const ETH_PROVIDER_KEY: &str = "ETH_PROVIDER";
 const RSA_PEM_KEY: &str = "RSA_PEM";
 
 // https://github.com/cloudflare/workers-rs/issues/64
@@ -61,12 +62,25 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
             UserInfoPayload { access_token: None }
         };
         let base_url = ctx.var(BASE_URL_KEY)?.to_string().parse().unwrap();
+        let eth_provider = ctx
+            .var(ETH_PROVIDER_KEY)
+            .map(|p| p.to_string().parse().unwrap())
+            .ok();
         let private_key = RsaPrivateKey::from_pkcs1_pem(&ctx.secret(RSA_PEM_KEY)?.to_string())
             .map_err(|e| anyhow!("Failed to load private key: {}", e))
             .unwrap();
         let url = req.url()?;
         let db_client = CFClient { ctx, url };
-        match oidc::userinfo(base_url, private_key, bearer, payload, &db_client).await {
+        match oidc::userinfo(
+            base_url,
+            eth_provider,
+            private_key,
+            bearer,
+            payload,
+            &db_client,
+        )
+        .await
+        {
             Ok(oidc::UserInfoResponse::Json(r)) => Ok(Response::from_json(&r)?),
             Ok(oidc::UserInfoResponse::Jwt(r)) => {
                 let mut headers = Headers::new();
@@ -144,6 +158,10 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 .unwrap();
             let base_url = ctx.var(BASE_URL_KEY)?.to_string().parse().unwrap();
             let url = req.url()?;
+            let eth_provider = ctx
+                .var(ETH_PROVIDER_KEY)
+                .map(|p| p.to_string().parse().unwrap())
+                .ok();
             let db_client = CFClient { ctx, url };
             let token_response = oidc::token(
                 TokenForm {
@@ -156,6 +174,7 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 private_key,
                 base_url,
                 false,
+                eth_provider,
                 &db_client,
             )
             .await;

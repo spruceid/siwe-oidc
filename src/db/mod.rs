@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{offset::Utc, DateTime};
+use ethers_core::types::H160;
 use openidconnect::{core::CoreClientMetadata, Nonce};
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +20,7 @@ pub const ENTRY_LIFETIME: usize = 30;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CodeEntry {
     pub exchange_count: usize,
-    pub address: String,
+    pub address: H160,
     pub nonce: Option<Nonce>,
     pub client_id: String,
     pub auth_time: DateTime<Utc>,

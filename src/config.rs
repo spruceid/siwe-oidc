@@ -15,6 +15,7 @@ pub struct Config {
     pub default_clients: HashMap<String, String>,
     // TODO secret is more complicated than that, and needs to be in the well-known config
     pub require_secret: bool,
+    pub eth_provider: Option<Url>,
 }
 
 impl Default for Config {
@@ -27,6 +28,7 @@ impl Default for Config {
             redis_url: Url::parse("redis://localhost").unwrap(),
             default_clients: HashMap::default(),
             require_secret: false,
+            eth_provider: None,
         }
     }
 }
