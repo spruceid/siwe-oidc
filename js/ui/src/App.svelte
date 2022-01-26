@@ -85,7 +85,7 @@
 	});
 
 	let oidc_nonce_param = '';
-	if (oidc_nonce != '') {
+	if (oidc_nonce != null && oidc_nonce != '') {
 		oidc_nonce_param = `&oidc_nonce=${oidc_nonce}`;
 	}
 	client.on('signIn', (result) => {
