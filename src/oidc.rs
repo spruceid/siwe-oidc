@@ -368,7 +368,7 @@ pub async fn authorize(
     }
     let _response_type = params.response_type.as_ref().unwrap();
 
-    for scope in params.scope.as_str().split(' ') {
+    for scope in params.scope.as_str().trim().split(' ') {
         if !SCOPES.contains(&Scope::new(scope.to_string())) {
             return Err(anyhow!("Scope not supported: {}", scope).into());
         }
