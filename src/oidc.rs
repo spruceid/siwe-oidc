@@ -179,6 +179,10 @@ pub struct TokenForm {
     pub grant_type: CoreGrantType, // TODO should just be authorization_code apparently?
 }
 
+fn subject_id(address: &H160) -> SubjectIdentifier {
+    SubjectIdentifier::new(format!("eip155:1:{}", to_checksum(address, None)))
+}
+
 pub async fn token(
     form: TokenForm,
     // From the request's Authorization header
@@ -240,13 +244,9 @@ pub async fn token(
         vec![Audience::new(client_id.clone())],
         Utc::now() + Duration::seconds(60),
         Utc::now(),
-        StandardClaims::new(SubjectIdentifier::new(to_checksum(
-            &code_entry.address,
-            None,
-        )))
-        .set_preferred_username(Some(EndUserUsername::new(
-            resolve_name(eth_provider, code_entry.address).await,
-        ))),
+        StandardClaims::new(subject_id(&code_entry.address)).set_preferred_username(Some(
+            EndUserUsername::new(resolve_name(eth_provider, code_entry.address).await),
+        )),
         EmptyAdditionalClaims {},
     )
     .set_nonce(code_entry.nonce)
@@ -585,13 +585,9 @@ pub async fn userinfo(
     };
 
     let response = CoreUserInfoClaims::new(
-        StandardClaims::new(SubjectIdentifier::new(to_checksum(
-            &code_entry.address,
-            None,
-        )))
-        .set_preferred_username(Some(EndUserUsername::new(
-            resolve_name(eth_provider, code_entry.address).await,
-        ))),
+        StandardClaims::new(subject_id(&code_entry.address)).set_preferred_username(Some(
+            EndUserUsername::new(resolve_name(eth_provider, code_entry.address).await),
+        )),
         EmptyAdditionalClaims::default(),
     )
     .set_issuer(Some(IssuerUrl::from_url(base_url.clone())))
