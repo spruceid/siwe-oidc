@@ -15,8 +15,6 @@
 	export let oidc_nonce: string;
 	export let client_id: string;
 
-	let uri: string = window.location.href.split('?')[0];
-
 	// Could be exposed in the future.
 	export let useENS: boolean = true;
 
@@ -24,12 +22,13 @@
 
 	let client = new Client({
 		session: {
-			domain,
-			uri,
+			domain: window.location.host,
+			uri: window.location.origin,
 			useENS,
 			version: '1',
 			// TODO: Vet this as the default statement.
-			statement: 'Sign-In With Ethereum OpenID-Connect',
+			statement: `You are signing-in to ${domain}.`,
+			resources: [redirect],
 		},
 		modal: {
 			theme: 'dark',
