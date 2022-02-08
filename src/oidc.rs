@@ -173,7 +173,7 @@ async fn resolve_name(eth_provider: Option<Url>, address: H160) -> String {
     }
 }
 
-async fn resolve_avatar(eth_provider: Option<Url>, address: H160) -> Option<Url> {
+async fn resolve_avatar(_eth_provider: Option<Url>, _address: H160) -> Option<Url> {
     None
 }
 

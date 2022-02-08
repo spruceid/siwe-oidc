@@ -116,20 +116,14 @@ impl DBClient for CFClient {
         Ok(())
     }
     async fn get_client(&self, client_id: String) -> Result<Option<ClientEntry>> {
-        let entry = self
+        Ok(self
             .ctx
             .kv(KV_NAMESPACE)
             .map_err(|e| anyhow!("Failed to get KV store: {}", e))?
             .get(&format!("{}/{}", KV_CLIENT_PREFIX, client_id))
+            .json()
             .await
-            .map_err(|e| anyhow!("Failed to get KV: {}", e))?
-            .map(|e| e.as_string());
-        if let Some(e) = entry {
-            Ok(serde_json::from_str(&e)
-                .map_err(|e| anyhow!("Failed to deserialize client entry: {}", e))?)
-        } else {
-            Ok(None)
-        }
+            .map_err(|e| anyhow!("Failed to get KV: {}", e))?)
     }
     async fn set_code(&self, code: String, code_entry: CodeEntry) -> Result<()> {
         let namespace = self
