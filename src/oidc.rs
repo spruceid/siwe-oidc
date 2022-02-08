@@ -7,8 +7,8 @@ use iri_string::types::UriString;
 use openidconnect::{
     core::{
         CoreAuthErrorResponseType, CoreAuthPrompt, CoreClaimName, CoreClientAuthMethod,
-        CoreClientMetadata, CoreClientRegistrationResponse, CoreErrorResponseType, CoreGrantType,
-        CoreIdToken, CoreIdTokenClaims, CoreIdTokenFields, CoreJsonWebKeySet,
+        CoreClientMetadata, CoreClientRegistrationResponse, CoreErrorResponseType, CoreGenderClaim,
+        CoreGrantType, CoreIdToken, CoreIdTokenClaims, CoreIdTokenFields, CoreJsonWebKeySet,
         CoreJwsSigningAlgorithm, CoreProviderMetadata, CoreRegisterErrorResponseType,
         CoreResponseType, CoreRsaPrivateSigningKey, CoreSubjectIdentifierType, CoreTokenResponse,
         CoreTokenType, CoreUserInfoClaims, CoreUserInfoJsonWebToken,
@@ -16,9 +16,10 @@ use openidconnect::{
     registration::{EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse},
     url::Url,
     AccessToken, Audience, AuthUrl, ClientId, ClientSecret, EmptyAdditionalClaims,
-    EmptyAdditionalProviderMetadata, EmptyExtraTokenFields, EndUserUsername, IssuerUrl,
-    JsonWebKeyId, JsonWebKeySetUrl, Nonce, PrivateSigningKey, RedirectUrl, RegistrationUrl,
-    RequestUrl, ResponseTypes, Scope, StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
+    EmptyAdditionalProviderMetadata, EmptyExtraTokenFields, EndUserPictureUrl, EndUserUsername,
+    IssuerUrl, JsonWebKeyId, JsonWebKeySetUrl, LocalizedClaim, Nonce, PrivateSigningKey,
+    RedirectUrl, RegistrationUrl, RequestUrl, ResponseTypes, Scope, StandardClaims,
+    SubjectIdentifier, TokenUrl, UserInfoUrl,
 };
 use rsa::{pkcs1::ToRsaPrivateKey, RsaPrivateKey};
 use serde::{Deserialize, Serialize};
@@ -133,6 +134,7 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
         CoreClaimName::new("iat".to_string()),
         CoreClaimName::new("iss".to_string()),
         CoreClaimName::new("preferred_username".to_string()),
+        CoreClaimName::new("picture".to_string()),
     ]))
     .set_registration_endpoint(Some(RegistrationUrl::from_url(
         base_url
@@ -169,6 +171,25 @@ async fn resolve_name(eth_provider: Option<Url>, address: H160) -> String {
             address_string
         }
     }
+}
+
+async fn resolve_avatar(eth_provider: Option<Url>, address: H160) -> Option<Url> {
+    None
+}
+
+async fn resolve_claims(
+    eth_provider: Option<Url>,
+    address: H160,
+) -> StandardClaims<CoreGenderClaim> {
+    StandardClaims::new(subject_id(&address))
+        .set_preferred_username(Some(EndUserUsername::new(
+            resolve_name(eth_provider.clone(), address).await,
+        )))
+        .set_picture(resolve_avatar(eth_provider, address).await.map(|a| {
+            let mut avatar_localized = LocalizedClaim::new();
+            avatar_localized.insert(None, EndUserPictureUrl::new(a.to_string()));
+            avatar_localized
+        }))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -244,9 +265,7 @@ pub async fn token(
         vec![Audience::new(client_id.clone())],
         Utc::now() + Duration::seconds(60),
         Utc::now(),
-        StandardClaims::new(subject_id(&code_entry.address)).set_preferred_username(Some(
-            EndUserUsername::new(resolve_name(eth_provider, code_entry.address).await),
-        )),
+        resolve_claims(eth_provider, code_entry.address).await,
         EmptyAdditionalClaims {},
     )
     .set_nonce(code_entry.nonce)
@@ -591,9 +610,7 @@ pub async fn userinfo(
     };
 
     let response = CoreUserInfoClaims::new(
-        StandardClaims::new(subject_id(&code_entry.address)).set_preferred_username(Some(
-            EndUserUsername::new(resolve_name(eth_provider, code_entry.address).await),
-        )),
+        resolve_claims(eth_provider, code_entry.address).await,
         EmptyAdditionalClaims::default(),
     )
     .set_issuer(Some(IssuerUrl::from_url(base_url.clone())))
