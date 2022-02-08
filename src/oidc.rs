@@ -425,22 +425,11 @@ struct Web3ModalMessage {
     pub expiration_time: Option<String>,
     pub not_before: Option<String>,
     pub request_id: Option<String>,
-    pub resources: Option<Vec<String>>,
+    pub resources: Vec<UriString>,
 }
 
 impl Web3ModalMessage {
     fn to_eip4361_message(&self) -> Result<Message> {
-        let mut next_resources: Vec<UriString> = Vec::new();
-        match &self.resources {
-            Some(resources) => {
-                for resource in resources {
-                    let x = UriString::from_str(resource)?;
-                    next_resources.push(x)
-                }
-            }
-            None => {}
-        }
-
         Ok(Message {
             domain: self.domain.clone().try_into()?,
             address: self.address.0,
@@ -459,7 +448,7 @@ impl Web3ModalMessage {
                 None => None,
             },
             request_id: self.request_id.clone(),
-            resources: next_resources,
+            resources: self.resources.clone(),
         })
     }
 }
@@ -511,8 +500,8 @@ pub async fn sign_in(
         .verify(signature)
         .map_err(|e| anyhow!("Failed signature validation: {}", e))?;
 
-    let domain = params.redirect_uri.url().host().unwrap();
-    if domain.to_string() != siwe_cookie.message.domain {
+    let domain = params.redirect_uri.url();
+    if domain.to_string() != *siwe_cookie.message.resources.get(0).unwrap().to_string() {
         return Err(anyhow!("Conflicting domains in message and redirect").into());
     }
     if expected_nonce.is_some() && expected_nonce.unwrap() != siwe_cookie.message.nonce {
