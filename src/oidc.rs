@@ -22,7 +22,7 @@ use openidconnect::{
 };
 use rsa::{pkcs1::ToRsaPrivateKey, RsaPrivateKey};
 use serde::{Deserialize, Serialize};
-use siwe::eip4361::{Message, Version};
+use siwe::{Message, TimeStamp, Version};
 use std::{str::FromStr, time};
 use thiserror::Error;
 use tracing::{error, info};
@@ -400,7 +400,7 @@ struct Web3ModalMessage {
     pub statement: String,
     pub uri: String,
     pub version: String,
-    pub chain_id: String,
+    pub chain_id: u64,
     pub nonce: String,
     pub issued_at: String,
     pub expiration_time: Option<String>,
@@ -425,14 +425,20 @@ impl Web3ModalMessage {
         Ok(Message {
             domain: self.domain.clone().try_into()?,
             address: self.address.0,
-            statement: self.statement.to_string(),
+            statement: Some(self.statement.to_string()),
             uri: UriString::from_str(&self.uri)?,
             version: Version::from_str(&self.version)?,
-            chain_id: self.chain_id.to_string(),
+            chain_id: self.chain_id,
             nonce: self.nonce.to_string(),
-            issued_at: self.issued_at.to_string(),
-            expiration_time: self.expiration_time.clone(),
-            not_before: self.not_before.clone(),
+            issued_at: TimeStamp::from_str(&self.issued_at)?,
+            expiration_time: match &self.expiration_time {
+                Some(t) => Some(TimeStamp::from_str(t)?),
+                None => None,
+            },
+            not_before: match &self.not_before {
+                Some(t) => Some(TimeStamp::from_str(t)?),
+                None => None,
+            },
             request_id: self.request_id.clone(),
             resources: next_resources,
         })
