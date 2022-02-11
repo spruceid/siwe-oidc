@@ -34,6 +34,12 @@ impl From<CustomError> for Result<Response> {
     }
 }
 
+fn get_cors() -> Cors {
+    Cors::new()
+        .with_origins(vec!["*".to_string()])
+        .with_allowed_headers(vec!["authorization".to_string()])
+}
+
 pub async fn main(req: Request, env: Env) -> Result<Response> {
     console_error_panic_hook::set_once();
     // tracing_subscriber::fmt::init();
@@ -96,6 +102,7 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
             }
             Err(e) => e.into(),
         }
+        .and_then(|r| r.with_cors(&get_cors()))
     };
 
     let router = Router::new();
@@ -105,6 +112,7 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 Ok(m) => Response::from_json(&m),
                 Err(e) => e.into(),
             }
+            .and_then(|r| r.with_cors(&get_cors()))
         })
         .get_async(oidc::JWK_PATH, |_req, ctx| async move {
             let private_key = RsaPrivateKey::from_pkcs1_pem(&ctx.secret(RSA_PEM_KEY)?.to_string())
@@ -114,6 +122,10 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 Ok(m) => Response::from_json(&m),
                 Err(e) => e.into(),
             }
+            .and_then(|r| r.with_cors(&get_cors()))
+        })
+        .options_async(oidc::TOKEN_PATH, |mut _req, _ctx| async move {
+            Response::empty()?.with_cors(&get_cors())
         })
         .post_async(oidc::TOKEN_PATH, |mut req, ctx| async move {
             let form_data = req.form_data().await?;
@@ -182,6 +194,7 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 Ok(m) => Response::from_json(&m),
                 Err(e) => e.into(),
             }
+            .and_then(|r| r.with_cors(&get_cors()))
         })
         // TODO add browser session
         .get_async(oidc::AUTHORIZE_PATH, |req, ctx| async move {

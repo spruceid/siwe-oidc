@@ -3332,8 +3332,7 @@ dependencies = [
 [[package]]
 name = "worker"
 version = "0.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3848a83f15d6b2908b1654d123d11ae6dadd8b5bd77709847603752a0932dc77"
+source = "git+https://github.com/cloudflare/workers-rs?branch=main#fd03338a41f926ce13a56dd92c46724acda2a327"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3342,6 +3341,7 @@ dependencies = [
  "http",
  "js-sys",
  "matchit",
+ "pin-project",
  "serde",
  "serde_json",
  "url",
@@ -3369,8 +3369,7 @@ dependencies = [
 [[package]]
 name = "worker-macros"
 version = "0.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bfb9b32a234ca78c62a3214f8d894eebea4930fb5d8730d79c4a3fbf1537703"
+source = "git+https://github.com/cloudflare/workers-rs?branch=main#fd03338a41f926ce13a56dd92c46724acda2a327"
 dependencies = [
  "async-trait",
  "proc-macro2",
@@ -3385,8 +3384,7 @@ dependencies = [
 [[package]]
 name = "worker-sys"
 version = "0.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f43ff762466dbaa7a1a8a191882829dea9f2c216bdedf8c40c6cff4a9e6c148"
+source = "git+https://github.com/cloudflare/workers-rs?branch=main#fd03338a41f926ce13a56dd92c46724acda2a327"
 dependencies = [
  "cfg-if 0.1.10",
  "js-sys",
