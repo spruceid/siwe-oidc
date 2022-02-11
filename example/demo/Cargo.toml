@@ -1,0 +1,17 @@
+[package]
+name = "demo"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+yew = "0.19.3"
+yew-router = "0.16.0"
+url = "2.2.2"
+lazy_static = "1.4.0"
+serde = "1.0.136"
+openidconnect = {git = "https://github.com/sbihel/openidconnect-rs", branch = "main", default-features = false, features = ["reqwest", "rustls-tls", "rustcrypto"]}
+wasm-bindgen-futures = "0.4.29"
+serde_json = "1.0.78"
+chrono = { version = "0.4.19", features = ["wasmbind"] }

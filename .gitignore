@@ -1,3 +1,5 @@
-/target
+**/target
 /static/build
-wrangler.toml
+**/wrangler.toml
+**/node_module
+**/dist

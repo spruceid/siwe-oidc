@@ -1,0 +1,19 @@
+name = "siwe-oidc-demo"
+type = "webpack"
+account_id = ""
+
+workers_dev = false
+
+zone_id = ""
+routes = ["demo-oidc.login.xyz/*"]
+
+compatibility_date = "2022-02-10"
+
+[build]
+command = "cargo install -q trunk && trunk build"
+
+[build.upload]
+format = "service-worker"
+
+[site]
+bucket = "./dist"
