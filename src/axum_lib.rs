@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use async_redis_session::RedisSessionStore;
 use axum::{
-    extract::{self, Extension, Form, Query, TypedHeader},
+    extract::{self, Extension, Form, Path, Query, TypedHeader},
     http::{
         header::{self, HeaderMap},
         StatusCode,
@@ -56,6 +56,7 @@ impl IntoResponse for CustomError {
             CustomError::Unauthorized(_) => {
                 (StatusCode::UNAUTHORIZED, self.to_string()).into_response()
             }
+            CustomError::NotFound => (StatusCode::NOT_FOUND, self.to_string()).into_response(),
             CustomError::Redirect(uri) => Redirect::to(
                 uri.parse().unwrap(),
                 // .map_err(|e| anyhow!("Could not parse URI: {}", e))?,
@@ -286,6 +287,13 @@ async fn userinfo(
     })
 }
 
+async fn clientinfo(
+    Path(client_id): Path<String>,
+    Extension(redis_client): Extension<RedisClient>,
+) -> Result<Json<CoreClientMetadata>, CustomError> {
+    Ok(oidc::clientinfo(client_id, &redis_client).await?.into())
+}
+
 async fn healthcheck() {}
 
 pub async fn main() {
@@ -392,6 +400,7 @@ pub async fn main() {
         .route(oidc::AUTHORIZE_PATH, get(authorize))
         .route(oidc::REGISTER_PATH, post(register))
         .route(oidc::USERINFO_PATH, get(userinfo).post(userinfo))
+        .route(&format!("{}/:id", oidc::CLIENTINFO_PATH), get(clientinfo))
         .route(oidc::SIGNIN_PATH, get(sign_in))
         .route("/health", get(healthcheck))
         .layer(AddExtensionLayer::new(private_key))

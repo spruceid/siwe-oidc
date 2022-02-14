@@ -50,6 +50,7 @@ pub const AUTHORIZE_PATH: &str = "/authorize";
 pub const REGISTER_PATH: &str = "/register";
 pub const USERINFO_PATH: &str = "/userinfo";
 pub const SIGNIN_PATH: &str = "/sign_in";
+pub const CLIENTINFO_PATH: &str = "/clientinfo";
 pub const SIWE_COOKIE_KEY: &str = "siwe";
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -73,6 +74,8 @@ pub enum CustomError {
     BadRequestToken(TokenError),
     #[error("{0}")]
     Unauthorized(String),
+    #[error("Not found")]
+    NotFound,
     #[error("{0:?}")]
     Redirect(String),
     #[error(transparent)]
@@ -559,6 +562,17 @@ pub async fn register(
         EmptyAdditionalClientRegistrationResponse::default(),
     )
     .set_client_secret(Some(ClientSecret::new(secret.to_string()))))
+}
+
+pub async fn clientinfo(
+    client_id: String,
+    db_client: &DBClientType,
+) -> Result<CoreClientMetadata, CustomError> {
+    let client_entry = db_client
+        .get_client(client_id)
+        .await?
+        .ok_or_else(|| CustomError::NotFound)?;
+    Ok(client_entry.metadata)
 }
 
 #[derive(Deserialize)]

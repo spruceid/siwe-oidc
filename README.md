@@ -40,6 +40,7 @@ siweoidc.example.com/r*
 siweoidc.example.com/a*
 siweoidc.example.com/t*
 siweoidc.example.com/j*
+siweoidc.example.com/c*
 siweoidc.example.com/.w*
 ```
 

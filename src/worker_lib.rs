@@ -28,6 +28,7 @@ impl From<CustomError> for Result<Response> {
             }
             CustomError::BadRequestToken(e) => Response::from_json(&e).map(|r| r.with_status(400)),
             CustomError::Unauthorized(_) => Response::error(&error.to_string(), 401),
+            CustomError::NotFound => Response::error(&error.to_string(), 404),
             CustomError::Redirect(uri) => Response::redirect(uri.parse().unwrap()),
             CustomError::Other(_) => Response::error(&error.to_string(), 500),
         }
@@ -234,6 +235,22 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
         })
         .post_async(oidc::USERINFO_PATH, userinfo)
         .get_async(oidc::USERINFO_PATH, userinfo)
+        .get_async(
+            &format!("{}/:id", oidc::CLIENTINFO_PATH),
+            |req, ctx| async move {
+                let client_id = if let Some(id) = ctx.param("id") {
+                    id.clone()
+                } else {
+                    return Response::error("Bad Request", 400);
+                };
+                let url = req.url()?;
+                let db_client = CFClient { ctx, url };
+                match oidc::clientinfo(client_id, &db_client).await {
+                    Ok(r) => Ok(Response::from_json(&r)?),
+                    Err(e) => e.into(),
+                }
+            },
+        )
         .get_async(oidc::SIGNIN_PATH, |req, ctx| async move {
             let url = req.url()?;
             let query = url.query().unwrap_or_default();
