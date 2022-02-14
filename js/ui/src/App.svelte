@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+
 	import Portis from '@portis/web3';
 	import { Client } from '@spruceid/siwe-web3modal';
 	import Torus from '@toruslabs/torus-embed';
@@ -83,6 +85,15 @@
 		},
 	});
 
+	let client_metadata = {};
+	onMount(async () => {
+		try {
+			client_metadata = JSON.parse(await fetch(`${window.location.origin}/client/${client_id}`));
+		} catch (e) {
+			console.error(e);
+		}
+	});
+
 	let oidc_nonce_param = '';
 	if (oidc_nonce != null && oidc_nonce != '') {
 		oidc_nonce_param = `&oidc_nonce=${oidc_nonce}`;
@@ -100,9 +111,16 @@
 	style="background-image: url('img/swe-landing.svg');"
 >
 	<div class="w-96 text-center bg-white rounded-20 text-grey flex h-96 flex-col p-12 shadow-lg shadow-white">
-		<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
+		{#if client_metadata.logo_uri}
+			<div class="flex justify-evenly items-stretch">
+				<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
+				<img height="72" width="72" class="self-center mb-8" src="{client_metadata.logo_uri}" alt="Client logo" />
+			</div>
+		{:else}
+			<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
+		{/if}
 		<h5>Welcome</h5>
-		<span class="text-xs">Sign-In with Ethereum to continue to your application</span>
+		<span class="text-xs">Sign-In with Ethereum to continue to {client_metadata.client_name ? client_metadata.client_name : domain}</span>
 
 		<button
 			class="h-12 border hover:scale-105 justify-evenly shadow-xl border-white mt-auto duration-100 ease-in-out transition-all transform flex items-center"
@@ -138,6 +156,10 @@
 			</svg>
 			<p class="font-bold">Sign-In with Ethereum</p>
 		</button>
+
+		{#if client_metadata.client_uri}
+			<span class="text-xs mt-4">Request linked to {client_metadata.client_uri}</span>
+		{/if}
 	</div>
 </div>
 
