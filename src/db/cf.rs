@@ -115,6 +115,7 @@ impl DBClient for CFClient {
             .map_err(|e| anyhow!("Failed to put KV: {}", e))?;
         Ok(())
     }
+
     async fn get_client(&self, client_id: String) -> Result<Option<ClientEntry>> {
         Ok(self
             .ctx
@@ -125,6 +126,17 @@ impl DBClient for CFClient {
             .await
             .map_err(|e| anyhow!("Failed to get KV: {}", e))?)
     }
+
+    async fn delete_client(&self, client_id: String) -> Result<()> {
+        Ok(self
+            .ctx
+            .kv(KV_NAMESPACE)
+            .map_err(|e| anyhow!("Failed to get KV store: {}", e))?
+            .delete(&format!("{}/{}", KV_CLIENT_PREFIX, client_id))
+            .await
+            .map_err(|e| anyhow!("Failed to get KV: {}", e))?)
+    }
+
     async fn set_code(&self, code: String, code_entry: CodeEntry) -> Result<()> {
         let namespace = self
             .ctx

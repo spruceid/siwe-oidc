@@ -10,7 +10,7 @@ kv_namespaces = [
 ]
 
 [vars]
-WORKERS_RS_VERSION = "0.0.7"
+WORKERS_RS_VERSION = "0.0.9"
 BASE_URL = "https://siweoidc.spruceid.xyz"
 # ETH_PROVIDER = ""
 

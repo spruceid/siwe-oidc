@@ -226,9 +226,10 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
         })
         .post_async(oidc::REGISTER_PATH, |mut req, ctx| async move {
             let payload = req.json().await?;
+            let base_url = ctx.var(BASE_URL_KEY)?.to_string().parse().unwrap();
             let url = req.url()?;
             let db_client = CFClient { ctx, url };
-            match oidc::register(payload, &db_client).await {
+            match oidc::register(payload, base_url, &db_client).await {
                 Ok(r) => Ok(Response::from_json(&r)?.with_status(201)),
                 Err(e) => e.into(),
             }
@@ -236,17 +237,68 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
         .post_async(oidc::USERINFO_PATH, userinfo)
         .get_async(oidc::USERINFO_PATH, userinfo)
         .get_async(
-            &format!("{}/:id", oidc::CLIENTINFO_PATH),
+            &format!("{}/:id", oidc::CLIENT_PATH),
             |req, ctx| async move {
                 let client_id = if let Some(id) = ctx.param("id") {
                     id.clone()
                 } else {
                     return Response::error("Bad Request", 400);
                 };
+                let bearer = req
+                    .headers()
+                    .get(Authorization::<Bearer>::name().as_str())?
+                    .and_then(|b| HeaderValue::from_str(b.as_ref()).ok())
+                    .as_ref()
+                    .and_then(Bearer::decode);
                 let url = req.url()?;
                 let db_client = CFClient { ctx, url };
-                match oidc::clientinfo(client_id, &db_client).await {
+                match oidc::clientinfo(client_id, bearer, &db_client).await {
                     Ok(r) => Ok(Response::from_json(&r)?),
+                    Err(e) => e.into(),
+                }
+            },
+        )
+        .delete_async(
+            &format!("{}/:id", oidc::CLIENT_PATH),
+            |req, ctx| async move {
+                let client_id = if let Some(id) = ctx.param("id") {
+                    id.clone()
+                } else {
+                    return Response::error("Bad Request", 400);
+                };
+                let bearer = req
+                    .headers()
+                    .get(Authorization::<Bearer>::name().as_str())?
+                    .and_then(|b| HeaderValue::from_str(b.as_ref()).ok())
+                    .as_ref()
+                    .and_then(Bearer::decode);
+                let url = req.url()?;
+                let db_client = CFClient { ctx, url };
+                match oidc::client_delete(client_id, bearer, &db_client).await {
+                    Ok(()) => Ok(Response::empty()?.with_status(204)),
+                    Err(e) => e.into(),
+                }
+            },
+        )
+        .post_async(
+            &format!("{}/:id", oidc::CLIENT_PATH),
+            |mut req, ctx| async move {
+                let client_id = if let Some(id) = ctx.param("id") {
+                    id.clone()
+                } else {
+                    return Response::error("Bad Request", 400);
+                };
+                let bearer = req
+                    .headers()
+                    .get(Authorization::<Bearer>::name().as_str())?
+                    .and_then(|b| HeaderValue::from_str(b.as_ref()).ok())
+                    .as_ref()
+                    .and_then(Bearer::decode);
+                let payload = req.json().await?;
+                let url = req.url()?;
+                let db_client = CFClient { ctx, url };
+                match oidc::client_update(client_id, payload, bearer, &db_client).await {
+                    Ok(()) => Ok(Response::empty()?),
                     Err(e) => e.into(),
                 }
             },

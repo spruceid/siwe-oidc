@@ -7,7 +7,7 @@ use axum::{
         StatusCode,
     },
     response::{self, IntoResponse, Redirect},
-    routing::{get, get_service, post},
+    routing::{delete, get, get_service, post},
     AddExtensionLayer, Json, Router,
 };
 use bb8_redis::{bb8, RedisConnectionManager};
@@ -220,9 +220,10 @@ async fn sign_in(
 
 async fn register(
     extract::Json(payload): extract::Json<CoreClientMetadata>,
+    Extension(config): Extension<config::Config>,
     Extension(redis_client): Extension<RedisClient>,
 ) -> Result<(StatusCode, Json<CoreClientRegistrationResponse>), CustomError> {
-    let registration = oidc::register(payload, &redis_client).await?;
+    let registration = oidc::register(payload, config.base_url, &redis_client).await?;
     Ok((StatusCode::CREATED, registration.into()))
 }
 
@@ -289,9 +290,34 @@ async fn userinfo(
 
 async fn clientinfo(
     Path(client_id): Path<String>,
+    bearer: Option<TypedHeader<Authorization<Bearer>>>,
     Extension(redis_client): Extension<RedisClient>,
 ) -> Result<Json<CoreClientMetadata>, CustomError> {
-    Ok(oidc::clientinfo(client_id, &redis_client).await?.into())
+    Ok(
+        oidc::clientinfo(client_id, bearer.map(|b| b.0 .0), &redis_client)
+            .await?
+            .into(),
+    )
+}
+
+async fn client_update(
+    Path(client_id): Path<String>,
+    extract::Json(payload): extract::Json<CoreClientMetadata>,
+    bearer: Option<TypedHeader<Authorization<Bearer>>>,
+    Extension(redis_client): Extension<RedisClient>,
+) -> Result<(), CustomError> {
+    Ok(oidc::client_update(client_id, payload, bearer.map(|b| b.0 .0), &redis_client).await?)
+}
+
+async fn client_delete(
+    Path(client_id): Path<String>,
+    bearer: Option<TypedHeader<Authorization<Bearer>>>,
+    Extension(redis_client): Extension<RedisClient>,
+) -> Result<(StatusCode, ()), CustomError> {
+    Ok((
+        StatusCode::NO_CONTENT,
+        oidc::client_delete(client_id, bearer.map(|b| b.0 .0), &redis_client).await?,
+    ))
 }
 
 async fn healthcheck() {}
@@ -400,7 +426,9 @@ pub async fn main() {
         .route(oidc::AUTHORIZE_PATH, get(authorize))
         .route(oidc::REGISTER_PATH, post(register))
         .route(oidc::USERINFO_PATH, get(userinfo).post(userinfo))
-        .route(&format!("{}/:id", oidc::CLIENTINFO_PATH), get(clientinfo))
+        .route(&format!("{}/:id", oidc::CLIENT_PATH), get(clientinfo))
+        .route(&format!("{}/:id", oidc::CLIENT_PATH), delete(client_delete))
+        .route(&format!("{}/:id", oidc::CLIENT_PATH), post(client_update))
         .route(oidc::SIGNIN_PATH, get(sign_in))
         .route("/health", get(healthcheck))
         .layer(AddExtensionLayer::new(private_key))

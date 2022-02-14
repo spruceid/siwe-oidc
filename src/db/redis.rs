@@ -47,6 +47,18 @@ impl DBClient for RedisClient {
         }
     }
 
+    async fn delete_client(&self, client_id: String) -> Result<()> {
+        let mut conn = self
+            .pool
+            .get()
+            .await
+            .map_err(|e| anyhow!("Failed to get connection to database: {}", e))?;
+        conn.del(format!("{}/{}", KV_CLIENT_PREFIX, client_id))
+            .await
+            .map_err(|e| anyhow!("Failed to get kv: {}", e))?;
+        Ok(())
+    }
+
     async fn set_code(&self, code: String, code_entry: CodeEntry) -> Result<()> {
         let mut conn = self
             .pool

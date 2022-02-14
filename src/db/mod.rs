@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{offset::Utc, DateTime};
 use ethers_core::types::H160;
-use openidconnect::{core::CoreClientMetadata, Nonce};
+use openidconnect::{core::CoreClientMetadata, Nonce, RegistrationAccessToken};
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -30,6 +30,7 @@ pub struct CodeEntry {
 pub struct ClientEntry {
     pub secret: String,
     pub metadata: CoreClientMetadata,
+    pub access_token: Option<RegistrationAccessToken>,
 }
 
 // Using a trait to easily pass async functions with async_trait
@@ -38,6 +39,7 @@ pub struct ClientEntry {
 pub trait DBClient {
     async fn set_client(&self, client_id: String, client_entry: ClientEntry) -> Result<()>;
     async fn get_client(&self, client_id: String) -> Result<Option<ClientEntry>>;
+    async fn delete_client(&self, client_id: String) -> Result<()>;
     async fn set_code(&self, code: String, code_entry: CodeEntry) -> Result<()>;
     async fn get_code(&self, code: String) -> Result<Option<CodeEntry>>;
 }

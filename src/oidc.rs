@@ -15,12 +15,13 @@ use openidconnect::{
     },
     registration::{EmptyAdditionalClientMetadata, EmptyAdditionalClientRegistrationResponse},
     url::Url,
-    AccessToken, Audience, AuthUrl, ClientId, ClientSecret, EmptyAdditionalClaims,
+    AccessToken, Audience, AuthUrl, ClientConfigUrl, ClientId, ClientSecret, EmptyAdditionalClaims,
     EmptyAdditionalProviderMetadata, EmptyExtraTokenFields, EndUserPictureUrl, EndUserUsername,
     IssuerUrl, JsonWebKeyId, JsonWebKeySetUrl, LocalizedClaim, Nonce, PrivateSigningKey,
-    RedirectUrl, RegistrationUrl, RequestUrl, ResponseTypes, Scope, StandardClaims,
-    SubjectIdentifier, TokenUrl, UserInfoUrl,
+    RedirectUrl, RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseTypes, Scope,
+    StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
 };
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use rsa::{pkcs1::ToRsaPrivateKey, RsaPrivateKey};
 use serde::{Deserialize, Serialize};
 use siwe::{Message, TimeStamp, Version};
@@ -48,9 +49,9 @@ pub const JWK_PATH: &str = "/jwk";
 pub const TOKEN_PATH: &str = "/token";
 pub const AUTHORIZE_PATH: &str = "/authorize";
 pub const REGISTER_PATH: &str = "/register";
+pub const CLIENT_PATH: &str = "/client";
 pub const USERINFO_PATH: &str = "/userinfo";
 pub const SIGNIN_PATH: &str = "/sign_in";
-pub const CLIENTINFO_PATH: &str = "/clientinfo";
 pub const SIWE_COOKIE_KEY: &str = "siwe";
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -535,6 +536,7 @@ pub struct RegisterError {
 
 pub async fn register(
     payload: CoreClientMetadata,
+    base_url: Url,
     db_client: &DBClientType,
 ) -> Result<CoreClientRegistrationResponse, CustomError> {
     let id = Uuid::new_v4();
@@ -549,9 +551,18 @@ pub async fn register(
         }
     }
 
+    let access_token = RegistrationAccessToken::new(
+        thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(11)
+            .map(char::from)
+            .collect(),
+    );
+
     let entry = ClientEntry {
         secret: secret.to_string(),
         metadata: payload,
+        access_token: Some(access_token.clone()),
     };
     db_client.set_client(id.to_string(), entry).await?;
 
@@ -561,18 +572,62 @@ pub async fn register(
         EmptyAdditionalClientMetadata::default(),
         EmptyAdditionalClientRegistrationResponse::default(),
     )
-    .set_client_secret(Some(ClientSecret::new(secret.to_string()))))
+    .set_client_secret(Some(ClientSecret::new(secret.to_string())))
+    .set_registration_client_uri(Some(ClientConfigUrl::from_url(
+        base_url
+            .join(&format!("{}/{}", CLIENT_PATH, id))
+            .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
+    )))
+    .set_registration_access_token(Some(access_token)))
+}
+
+async fn client_access(
+    client_id: String,
+    bearer: Option<Bearer>,
+    db_client: &DBClientType,
+) -> Result<ClientEntry, CustomError> {
+    let access_token = if let Some(b) = bearer {
+        b.token().to_string()
+    } else {
+        return Err(CustomError::BadRequest("Missing access token.".to_string()));
+    };
+    let client_entry = db_client
+        .get_client(client_id)
+        .await?
+        .ok_or(CustomError::NotFound)?;
+    let stored_access_token = client_entry.access_token.clone();
+    if stored_access_token.is_none() || *stored_access_token.unwrap().secret() != access_token {
+        return Err(CustomError::Unauthorized("Bad access token.".to_string()));
+    }
+    Ok(client_entry)
 }
 
 pub async fn clientinfo(
     client_id: String,
+    bearer: Option<Bearer>,
     db_client: &DBClientType,
 ) -> Result<CoreClientMetadata, CustomError> {
-    let client_entry = db_client
-        .get_client(client_id)
-        .await?
-        .ok_or_else(|| CustomError::NotFound)?;
-    Ok(client_entry.metadata)
+    Ok(client_access(client_id, bearer, db_client).await?.metadata)
+}
+
+pub async fn client_delete(
+    client_id: String,
+    bearer: Option<Bearer>,
+    db_client: &DBClientType,
+) -> Result<(), CustomError> {
+    client_access(client_id.clone(), bearer, db_client).await?;
+    Ok(db_client.delete_client(client_id).await?)
+}
+
+pub async fn client_update(
+    client_id: String,
+    payload: CoreClientMetadata,
+    bearer: Option<Bearer>,
+    db_client: &DBClientType,
+) -> Result<(), CustomError> {
+    let mut client_entry = client_access(client_id.clone(), bearer, db_client).await?;
+    client_entry.metadata = payload;
+    Ok(db_client.set_client(client_id, client_entry).await?)
 }
 
 #[derive(Deserialize)]
