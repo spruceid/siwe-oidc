@@ -540,7 +540,11 @@ pub async fn register(
     db_client: &DBClientType,
 ) -> Result<CoreClientRegistrationResponse, CustomError> {
     let id = Uuid::new_v4();
-    let secret = Uuid::new_v4();
+    let secret: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect();
 
     let redirect_uris = payload.redirect_uris().to_vec();
     for uri in redirect_uris.iter() {
@@ -560,7 +564,7 @@ pub async fn register(
     );
 
     let entry = ClientEntry {
-        secret: secret.to_string(),
+        secret: secret.clone(),
         metadata: payload,
         access_token: Some(access_token.clone()),
     };
@@ -572,7 +576,7 @@ pub async fn register(
         EmptyAdditionalClientMetadata::default(),
         EmptyAdditionalClientRegistrationResponse::default(),
     )
-    .set_client_secret(Some(ClientSecret::new(secret.to_string())))
+    .set_client_secret(Some(ClientSecret::new(secret)))
     .set_registration_client_uri(Some(ClientConfigUrl::from_url(
         base_url
             .join(&format!("{}/{}", CLIENT_PATH, id))
