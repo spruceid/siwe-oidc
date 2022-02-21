@@ -35,7 +35,6 @@ ethers-providers = "0.6.2"
 lazy_static = "1.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-async-session = "3.0.0"
 axum = { version = "0.4.3", features = ["headers"] }
 # axum-debug = "0.3.2"
 chrono = "0.4.19"
@@ -44,7 +43,6 @@ tokio = { version = "1.14.0", features = ["full"] }
 tower-http = { version = "0.2.0", features = ["fs", "trace", "cors"] }
 tracing-subscriber = { version = "0.3.2", features = ["env-filter"] }
 bb8-redis = "0.10.1"
-async-redis-session = "0.2.2"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

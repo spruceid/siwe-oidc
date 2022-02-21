@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
+use cookie::Cookie;
 use ethers_core::{types::H160, utils::to_checksum};
 use headers::{self, authorization::Bearer};
 use hex::FromHex;
@@ -315,9 +316,8 @@ pub struct AuthorizeParams {
 
 pub async fn authorize(
     params: AuthorizeParams,
-    nonce: String,
     db_client: &DBClientType,
-) -> Result<String, CustomError> {
+) -> Result<(String, Box<Cookie<'_>>), CustomError> {
     let client_entry = db_client
         .get_client(params.client_id.clone())
         .await
@@ -327,6 +327,12 @@ pub async fn authorize(
             "Unrecognised client id.".to_string(),
         ));
     }
+
+    let nonce: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect();
 
     let mut r_u = params.redirect_uri.clone().url().clone();
     r_u.set_query(None);
@@ -397,15 +403,45 @@ pub async fn authorize(
         }
     }
 
+    let session_id = Uuid::new_v4();
+    let session_secret: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect();
+    db_client
+        .set_session(
+            session_id.to_string(),
+            SessionEntry {
+                siwe_nonce: nonce.clone(),
+                oidc_nonce: params.nonce.clone(),
+                secret: session_secret.clone(),
+                signin_count: 0,
+            },
+        )
+        .await?;
+    let session_cookie = Cookie::build(SESSION_COOKIE_NAME, session_id.to_string())
+        // .domain(base)
+        // .path("/")
+        .secure(true)
+        .http_only(true)
+        .max_age(cookie::time::Duration::seconds(
+            SESSION_LIFETIME.try_into().unwrap(),
+        ))
+        .finish();
+
     let domain = params.redirect_uri.url().host().unwrap();
     let oidc_nonce_param = if let Some(n) = &params.nonce {
         format!("&oidc_nonce={}", n.secret())
     } else {
         "".to_string()
     };
-    Ok(format!(
-        "/?nonce={}&domain={}&redirect_uri={}&state={}&client_id={}{}",
-        nonce, domain, *params.redirect_uri, state, params.client_id, oidc_nonce_param
+    Ok((
+        format!(
+            "/?nonce={}&domain={}&redirect_uri={}&state={}&client_id={}{}",
+            nonce, domain, *params.redirect_uri, state, params.client_id, oidc_nonce_param
+        ),
+        Box::new(session_cookie),
     ))
 }
 
@@ -467,10 +503,29 @@ pub struct SignInParams {
 
 pub async fn sign_in(
     params: SignInParams,
-    expected_nonce: Option<String>,
+    // cookies_header: String,
     cookies: headers::Cookie,
     db_client: &DBClientType,
 ) -> Result<Url, CustomError> {
+    // TODO redirect on session errors
+    let session_id = if let Some(c) = cookies.get(SESSION_COOKIE_NAME) {
+        c
+    } else {
+        return Err(CustomError::BadRequest(
+            "Session cookie not found".to_string(),
+        ));
+    };
+    let session_entry = if let Some(e) = db_client.get_session(session_id.to_string()).await? {
+        e
+    } else {
+        return Err(CustomError::BadRequest("Session not found".to_string()));
+    };
+    if session_entry.signin_count > 0 {
+        return Err(CustomError::BadRequest(
+            "Session has already logged in".to_string(),
+        ));
+    }
+
     let siwe_cookie: SiweCookie = match cookies.get(SIWE_COOKIE_KEY) {
         Some(c) => serde_json::from_str(
             &decode(c).map_err(|e| anyhow!("Could not decode siwe cookie: {}", e))?,
@@ -508,7 +563,7 @@ pub async fn sign_in(
     if domain.to_string() != *siwe_cookie.message.resources.get(0).unwrap().to_string() {
         return Err(anyhow!("Conflicting domains in message and redirect").into());
     }
-    if expected_nonce.is_some() && expected_nonce.unwrap() != siwe_cookie.message.nonce {
+    if session_entry.siwe_nonce != siwe_cookie.message.nonce {
         return Err(anyhow!("Conflicting nonces in message and session").into());
     }
 
@@ -519,6 +574,12 @@ pub async fn sign_in(
         client_id: params.client_id.clone(),
         auth_time: Utc::now(),
     };
+
+    let mut new_session_entry = session_entry.clone();
+    new_session_entry.signin_count += 1;
+    db_client
+        .set_session(session_id.to_string(), new_session_entry)
+        .await?;
 
     let code = Uuid::new_v4();
     db_client.set_code(code.to_string(), code_entry).await?;

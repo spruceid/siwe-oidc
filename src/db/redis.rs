@@ -98,4 +98,40 @@ impl DBClient for RedisClient {
         .map_err(|e| anyhow!("Failed to deserialize code: {}", e))?;
         Ok(Some(code_entry))
     }
+
+    async fn set_session(&self, id: String, entry: SessionEntry) -> Result<()> {
+        let mut conn = self
+            .pool
+            .get()
+            .await
+            .map_err(|e| anyhow!("Failed to get connection to database: {}", e))?;
+
+        conn.set_ex(
+            format!("{}/{}", KV_SESSION_PREFIX, id),
+            serde_json::to_string(&entry)
+                .map_err(|e| anyhow!("Failed to serialize session entry: {}", e))?,
+            SESSION_LIFETIME.try_into().unwrap(),
+        )
+        .await
+        .map_err(|e| anyhow!("Failed to set kv: {}", e))?;
+        Ok(())
+    }
+
+    async fn get_session(&self, id: String) -> Result<Option<SessionEntry>> {
+        let mut conn = self
+            .pool
+            .get()
+            .await
+            .map_err(|e| anyhow!("Failed to get connection to database: {}", e))?;
+        let entry: Option<String> = conn
+            .get(format!("{}/{}", KV_SESSION_PREFIX, id))
+            .await
+            .map_err(|e| anyhow!("Failed to get kv: {}", e))?;
+        if let Some(e) = entry {
+            Ok(serde_json::from_str(&e)
+                .map_err(|e| anyhow!("Failed to deserialize session entry: {}", e))?)
+        } else {
+            Ok(None)
+        }
+    }
 }

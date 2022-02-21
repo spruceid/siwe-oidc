@@ -15,7 +15,10 @@ mod cf;
 pub use cf::CFClient;
 
 const KV_CLIENT_PREFIX: &str = "clients";
+const KV_SESSION_PREFIX: &str = "sessions";
 pub const ENTRY_LIFETIME: usize = 30;
+pub const SESSION_LIFETIME: u64 = 300; // 5min
+pub const SESSION_COOKIE_NAME: &str = "session";
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CodeEntry {
@@ -33,6 +36,14 @@ pub struct ClientEntry {
     pub access_token: Option<RegistrationAccessToken>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SessionEntry {
+    pub siwe_nonce: String,
+    pub oidc_nonce: Option<Nonce>,
+    pub secret: String,
+    pub signin_count: u64,
+}
+
 // Using a trait to easily pass async functions with async_trait
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
@@ -42,4 +53,6 @@ pub trait DBClient {
     async fn delete_client(&self, client_id: String) -> Result<()>;
     async fn set_code(&self, code: String, code_entry: CodeEntry) -> Result<()>;
     async fn get_code(&self, code: String) -> Result<Option<CodeEntry>>;
+    async fn set_session(&self, id: String, entry: SessionEntry) -> Result<()>;
+    async fn get_session(&self, id: String) -> Result<Option<SessionEntry>>;
 }

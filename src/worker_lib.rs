@@ -4,7 +4,6 @@ use headers::{
     authorization::{Basic, Bearer, Credentials},
     Authorization, ContentType, Header, HeaderValue,
 };
-use rand::{distributions::Alphanumeric, Rng};
 use rsa::{pkcs1::FromRsaPrivateKey, RsaPrivateKey};
 use worker::*;
 
@@ -197,7 +196,6 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
             }
             .and_then(|r| r.with_cors(&get_cors()))
         })
-        // TODO add browser session
         .get_async(oidc::AUTHORIZE_PATH, |req, ctx| async move {
             let base_url: Url = ctx.var(BASE_URL_KEY)?.to_string().parse().unwrap();
             let url = req.url()?;
@@ -206,15 +204,18 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 Ok(p) => p,
                 Err(_) => return CustomError::BadRequest("Bad query params".to_string()).into(),
             };
-            let nonce = rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(16)
-                .map(char::from)
-                .collect();
             let url = req.url()?;
             let db_client = CFClient { ctx, url };
-            match oidc::authorize(params, nonce, &db_client).await {
-                Ok(url) => Response::redirect(base_url.join(&url).unwrap()),
+            match oidc::authorize(params, &db_client).await {
+                Ok((url, session_cookie)) => {
+                    Response::redirect(base_url.join(&url).unwrap()).map(|r| {
+                        let mut headers = r.headers().clone();
+                        headers
+                            .set("set-cookie", &session_cookie.to_string())
+                            .unwrap();
+                        r.with_headers(headers)
+                    })
+                }
                 Err(e) => match e {
                     CustomError::Redirect(url) => {
                         CustomError::Redirect(base_url.join(&url).unwrap().to_string())
@@ -320,7 +321,7 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
             }
             let url = req.url()?;
             let db_client = CFClient { ctx, url };
-            match oidc::sign_in(params, None, cookies.unwrap(), &db_client).await {
+            match oidc::sign_in(params, cookies.unwrap(), &db_client).await {
                 Ok(url) => Response::redirect(url),
                 Err(e) => e.into(),
             }

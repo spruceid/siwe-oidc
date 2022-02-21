@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-// use cached::{stores::TimedCache, Cached};
 use chrono::{DateTime, Duration, Utc};
 use matchit::Node;
 use std::collections::HashMap;
@@ -109,7 +108,6 @@ impl DBClient for CFClient {
                     .map_err(|e| anyhow!("Failed to serialize client entry: {}", e))?,
             )
             .map_err(|e| anyhow!("Failed to build KV put: {}", e))?
-            // TODO put some sort of expiration for dynamic registration
             .execute()
             .await
             .map_err(|e| anyhow!("Failed to put KV: {}", e))?;
@@ -201,5 +199,33 @@ impl DBClient for CFClient {
             404 => Ok(None),
             code => Err(anyhow!("Error fetching from Durable Object: {}", code)),
         }
+    }
+
+    async fn set_session(&self, id: String, entry: SessionEntry) -> Result<()> {
+        self.ctx
+            .kv(KV_NAMESPACE)
+            .map_err(|e| anyhow!("Failed to get KV store: {}", e))?
+            .put(
+                &format!("{}/{}", KV_SESSION_PREFIX, id),
+                serde_json::to_string(&entry)
+                    .map_err(|e| anyhow!("Failed to serialize client entry: {}", e))?,
+            )
+            .map_err(|e| anyhow!("Failed to build KV put: {}", e))?
+            .expiration_ttl(SESSION_LIFETIME)
+            .execute()
+            .await
+            .map_err(|e| anyhow!("Failed to put KV: {}", e))?;
+        Ok(())
+    }
+
+    async fn get_session(&self, id: String) -> Result<Option<SessionEntry>> {
+        Ok(self
+            .ctx
+            .kv(KV_NAMESPACE)
+            .map_err(|e| anyhow!("Failed to get KV store: {}", e))?
+            .get(&format!("{}/{}", KV_SESSION_PREFIX, id))
+            .json()
+            .await
+            .map_err(|e| anyhow!("Failed to get KV: {}", e))?)
     }
 }
