@@ -347,7 +347,7 @@ pub async fn authorize(
     r_us.iter_mut().for_each(|u| u.set_query(None));
     if !r_us.contains(&r_u) {
         return Err(CustomError::Redirect(
-            "/error?message=unregistered_request_uri".to_string(),
+            "/error?message=unregistered_redirect_uri".to_string(),
         ));
     }
 
