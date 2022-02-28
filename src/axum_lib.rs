@@ -298,6 +298,17 @@ pub async fn main() {
             ),
         )
         .nest(
+            "/legal",
+            get_service(ServeDir::new("./static/legal")).handle_error(
+                |error: std::io::Error| async move {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled internal error: {}", error),
+                    )
+                },
+            ),
+        )
+        .nest(
             "/img",
             get_service(ServeDir::new("./static/img")).handle_error(
                 |error: std::io::Error| async move {

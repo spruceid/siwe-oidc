@@ -18,9 +18,9 @@ use openidconnect::{
     url::Url,
     AccessToken, Audience, AuthUrl, ClientConfigUrl, ClientId, ClientSecret, EmptyAdditionalClaims,
     EmptyAdditionalProviderMetadata, EmptyExtraTokenFields, EndUserPictureUrl, EndUserUsername,
-    IssuerUrl, JsonWebKeyId, JsonWebKeySetUrl, LocalizedClaim, Nonce, PrivateSigningKey,
-    RedirectUrl, RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseTypes, Scope,
-    StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
+    IssuerUrl, JsonWebKeyId, JsonWebKeySetUrl, LocalizedClaim, Nonce, OpPolicyUrl, OpTosUrl,
+    PrivateSigningKey, RedirectUrl, RegistrationAccessToken, RegistrationUrl, RequestUrl,
+    ResponseTypes, Scope, StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
 };
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use rsa::{pkcs1::ToRsaPrivateKey, RsaPrivateKey};
@@ -54,6 +54,8 @@ pub const CLIENT_PATH: &str = "/client";
 pub const USERINFO_PATH: &str = "/userinfo";
 pub const SIGNIN_PATH: &str = "/sign_in";
 pub const SIWE_COOKIE_KEY: &str = "siwe";
+pub const TOU_PATH: &str = "/legal/terms-of-use.pdf";
+pub const PP_PATH: &str = "/legal/privacy-policy.pdf";
 
 #[cfg(not(target_arch = "wasm32"))]
 type DBClientType = (dyn DBClient + Sync);
@@ -150,7 +152,17 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
         CoreClientAuthMethod::ClientSecretBasic,
         CoreClientAuthMethod::ClientSecretPost,
         CoreClientAuthMethod::PrivateKeyJwt,
-    ]));
+    ]))
+    .set_op_policy_uri(Some(OpPolicyUrl::from_url(
+        base_url
+            .join(PP_PATH)
+            .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
+    )))
+    .set_op_tos_uri(Some(OpTosUrl::from_url(
+        base_url
+            .join(TOU_PATH)
+            .map_err(|e| anyhow!("Unable to join URL: {}", e))?,
+    )));
 
     Ok(pm)
 }
