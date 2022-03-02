@@ -111,7 +111,7 @@
 	class="bg-no-repeat bg-cover bg-center bg-swe-landing font-satoshi bg-gray flex-grow w-full h-screen items-center flex justify-center flex-wrap flex-col"
 	style="background-image: url('img/swe-landing.svg');"
 >
-	<div class="w-96 text-center bg-white rounded-20 text-grey flex h-96 flex-col p-12 shadow-lg shadow-white">
+	<div class="w-96 text-center bg-white rounded-20 text-grey flex h-100 flex-col p-12 shadow-lg shadow-white">
 		{#if client_metadata.logo_uri}
 			<div class="flex justify-evenly items-stretch">
 				<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
@@ -126,7 +126,7 @@
 		</span>
 
 		<button
-			class="h-12 border hover:scale-105 justify-evenly shadow-xl border-white mt-auto duration-100 ease-in-out transition-all transform flex items-center"
+			class="h-12 border hover:scale-105 justify-evenly shadow-xl border-white mt-4 duration-100 ease-in-out transition-all transform flex items-center"
 			on:click={() => {
 				client.signIn(nonce).catch((e) => {
 					console.error(e);
@@ -159,10 +159,10 @@
 			</svg>
 			<p class="font-bold">Sign-In with Ethereum</p>
 		</button>
-		<small class="self-center mt-4 mb-2 text-center font-semibold">
+		<div class="self-center mt-auto text-center font-semibold text-xs">
 			By using this service you agree to the <a href="/legal/terms-of-use.pdf">Terms of Use</a> and
 			<a href="/legal/privacy-policy.pdf">Privacy Policy</a>.
-		</small>
+		</div>
 
 		{#if client_metadata.client_uri}
 			<span class="text-xs mt-4">Request linked to {client_metadata.client_uri}</span>
