@@ -1,11 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
 	import Portis from '@portis/web3';
 	import { Client } from '@spruceid/siwe-web3modal';
 	import Torus from '@toruslabs/torus-embed';
 	import WalletConnectProvider from '@walletconnect/web3-provider';
 	import Fortmatic from 'fortmatic';
+	import { onMount } from 'svelte';
 	import WalletLink from 'walletlink';
 
 	// TODO: REMOVE DEFAULTS:
@@ -101,7 +100,9 @@
 	client.on('signIn', (result) => {
 		console.log(result);
 		window.location.replace(
-			`/sign_in?redirect_uri=${encodeURI(redirect)}&state=${encodeURI(state)}&client_id=${encodeURI(client_id)}${encodeURI(oidc_nonce_param)}`,
+			`/sign_in?redirect_uri=${encodeURI(redirect)}&state=${encodeURI(state)}&client_id=${encodeURI(
+				client_id,
+			)}${encodeURI(oidc_nonce_param)}`,
 		);
 	});
 </script>
@@ -110,20 +111,22 @@
 	class="bg-no-repeat bg-cover bg-center bg-swe-landing font-satoshi bg-gray flex-grow w-full h-screen items-center flex justify-center flex-wrap flex-col"
 	style="background-image: url('img/swe-landing.svg');"
 >
-	<div class="w-96 text-center bg-white rounded-20 text-grey flex h-96 flex-col p-12 shadow-lg shadow-white">
+	<div class="w-96 text-center bg-white rounded-20 text-grey flex h-100 flex-col p-12 shadow-lg shadow-white">
 		{#if client_metadata.logo_uri}
 			<div class="flex justify-evenly items-stretch">
 				<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
-				<img height="72" width="72" class="self-center mb-8" src="{client_metadata.logo_uri}" alt="Client logo" />
+				<img height="72" width="72" class="self-center mb-8" src={client_metadata.logo_uri} alt="Client logo" />
 			</div>
 		{:else}
 			<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
 		{/if}
 		<h5>Welcome</h5>
-		<span class="text-xs">Sign-In with Ethereum to continue to {client_metadata.client_name ? client_metadata.client_name : domain}</span>
+		<span class="text-xs">
+			Sign-In with Ethereum to continue to {client_metadata.client_name ? client_metadata.client_name : domain}
+		</span>
 
 		<button
-			class="h-12 border hover:scale-105 justify-evenly shadow-xl border-white mt-auto duration-100 ease-in-out transition-all transform flex items-center"
+			class="h-12 border hover:scale-105 justify-evenly shadow-xl border-white mt-4 duration-100 ease-in-out transition-all transform flex items-center"
 			on:click={() => {
 				client.signIn(nonce).catch((e) => {
 					console.error(e);
@@ -156,6 +159,10 @@
 			</svg>
 			<p class="font-bold">Sign-In with Ethereum</p>
 		</button>
+		<div class="self-center mt-auto text-center font-semibold text-xs">
+			By using this service you agree to the <a href="/legal/terms-of-use.pdf">Terms of Use</a> and
+			<a href="/legal/privacy-policy.pdf">Privacy Policy</a>.
+		</div>
 
 		{#if client_metadata.client_uri}
 			<span class="text-xs mt-4">Request linked to {client_metadata.client_uri}</span>
