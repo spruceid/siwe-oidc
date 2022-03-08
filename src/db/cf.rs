@@ -7,7 +7,7 @@ use worker::*;
 
 use super::*;
 
-const KV_NAMESPACE: &str = "SIWE-OIDC";
+const KV_NAMESPACE: &str = "SIWE_OIDC";
 const DO_NAMESPACE: &str = "SIWE-OIDC-CODES";
 
 // /!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\/!\

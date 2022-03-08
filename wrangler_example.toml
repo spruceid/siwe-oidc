@@ -6,7 +6,7 @@ workers_dev = false
 compatibility_date = "2021-12-20"
 
 kv_namespaces = [
-    { binding = "SIWE-OIDC", id = "", preview_id = "" }
+    { binding = "SIWE_OIDC", id = "", preview_id = "" }
 ]
 
 [vars]
