@@ -86,7 +86,6 @@ OIDC Conformance Suite:
 
 * Additional information, from native projects (e.g. ENS domains profile
   pictures), to more traditional ones (e.g. email).
-* Browser session support for the Worker version.
 
 ## Development
 
