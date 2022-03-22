@@ -18,7 +18,7 @@ cp wrangler_example.toml wrangler.toml
 Replacing the following fields:
 - `account_id`: your Cloudflare account ID;
 - `zone_id`: (Optional) DNS zone ID; and
-- `kv_namespaces`: a KV namespace ID (created with `wrangler kv:namespace create SIWE-OIDC`).
+- `kv_namespaces`: a KV namespace ID (created with `wrangler kv:namespace create SIWE_OIDC`).
 
 At this point, you should be able to create/publish the worker:
 ```
