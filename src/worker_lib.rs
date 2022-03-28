@@ -90,7 +90,7 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
             Ok(oidc::UserInfoResponse::Json(r)) => Ok(Response::from_json(&r)?),
             Ok(oidc::UserInfoResponse::Jwt(r)) => {
                 let mut headers = Headers::new();
-                headers.append(&ContentType::name().to_string(), "application/jwt")?;
+                headers.append(ContentType::name().as_ref(), "application/jwt")?;
                 Ok(Response::from_bytes(
                     serde_json::to_string(&r)
                         .unwrap()
