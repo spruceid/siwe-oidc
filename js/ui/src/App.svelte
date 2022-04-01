@@ -5,7 +5,7 @@
 	import WalletConnectProvider from '@walletconnect/web3-provider';
 	import Fortmatic from 'fortmatic';
 	import { onMount } from 'svelte';
-	import WalletLink from 'walletlink';
+	import CoinbaseWalletSDK from "@coinbase/wallet-sdk";
 
 	// TODO: REMOVE DEFAULTS:
 	// main.ts will parse the params from the server
@@ -56,29 +56,12 @@
 						key: process.env.FORTMATIC_KEY,
 					},
 				},
-				'custom-coinbase': {
-					display: {
-						logo: 'img/coinbase.svg',
-						name: 'Coinbase',
-						description: 'Scan with WalletLink to connect',
-					},
+				walletlink: {
+					package: CoinbaseWalletSDK,
 					options: {
-						appName: 'Sign-In with Ethereum',
-						networkUrl: `https://mainnet.infura.io/v3/${process.env.INFURA_ID}`,
-						chainId: 1,
-						darkMode: false,
-					},
-					package: WalletLink,
-					connector: async (_, options) => {
-						const { appName, networkUrl, chainId, darkMode } = options;
-						const walletLink = new WalletLink({
-							appName,
-							darkMode,
-						});
-						const provider = walletLink.makeWeb3Provider(networkUrl, chainId);
-						await provider.enable();
-						return provider;
-					},
+						appName: "Sign-In with Ethereum",
+						infuraId: process.env.INFURA_ID
+					}
 				},
 			},
 		},
