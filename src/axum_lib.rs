@@ -227,7 +227,7 @@ async fn client_update(
     bearer: Option<TypedHeader<Authorization<Bearer>>>,
     Extension(redis_client): Extension<RedisClient>,
 ) -> Result<(), CustomError> {
-    Ok(oidc::client_update(client_id, payload, bearer.map(|b| b.0 .0), &redis_client).await?)
+    oidc::client_update(client_id, payload, bearer.map(|b| b.0 .0), &redis_client).await
 }
 
 async fn client_delete(
