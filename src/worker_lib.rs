@@ -18,6 +18,16 @@ const RSA_PEM_KEY: &str = "RSA_PEM";
 // #[global_allocator]
 // static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+/// To be used in conjunction of Request::json
+macro_rules! json_bad_request {
+    ($expression:expr) => {
+        match $expression {
+            Err(Error::SerdeJsonError(e)) => return Response::error(&e.to_string(), 400),
+            r => r,
+        }
+    };
+}
+
 impl From<CustomError> for Result<Response> {
     fn from(error: CustomError) -> Self {
         match error {
@@ -226,7 +236,7 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
             }
         })
         .post_async(oidc::REGISTER_PATH, |mut req, ctx| async move {
-            let payload = req.json().await?;
+            let payload = json_bad_request!(req.json().await)?;
             let base_url = ctx.var(BASE_URL_KEY)?.to_string().parse().unwrap();
             let url = req.url()?;
             let db_client = CFClient { ctx, url };
@@ -295,7 +305,7 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                     .and_then(|b| HeaderValue::from_str(b.as_ref()).ok())
                     .as_ref()
                     .and_then(Bearer::decode);
-                let payload = req.json().await?;
+                let payload = json_bad_request!(req.json().await)?;
                 let url = req.url()?;
                 let db_client = CFClient { ctx, url };
                 match oidc::client_update(client_id, payload, bearer, &db_client).await {
