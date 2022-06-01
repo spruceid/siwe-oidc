@@ -2,7 +2,7 @@ name: Publish Docker
 
 on:
   push:
-    branches: [ main, fix/docker ]
+    branches: [ main ]
   release:
     types: [published, created, edited]
 
