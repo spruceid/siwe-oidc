@@ -197,8 +197,14 @@ async fn resolve_avatar(_eth_provider: Option<Url>, _address: H160) -> Option<Ur
 async fn resolve_claims(
     eth_provider: Option<Url>,
     address: H160,
+    chain_id: u64,
 ) -> StandardClaims<CoreGenderClaim> {
-    StandardClaims::new(subject_id(&address))
+    let subject_id = SubjectIdentifier::new(format!(
+        "eip155:{}:{}",
+        chain_id,
+        to_checksum(&address, None)
+    ));
+    StandardClaims::new(subject_id)
         .set_preferred_username(Some(EndUserUsername::new(
             resolve_name(eth_provider.clone(), address).await,
         )))
@@ -215,10 +221,6 @@ pub struct TokenForm {
     pub client_id: Option<String>,
     pub client_secret: Option<String>,
     pub grant_type: CoreGrantType, // TODO should just be authorization_code apparently?
-}
-
-fn subject_id(address: &H160) -> SubjectIdentifier {
-    SubjectIdentifier::new(format!("eip155:1:{}", to_checksum(address, None)))
 }
 
 pub async fn token(
@@ -282,7 +284,12 @@ pub async fn token(
         vec![Audience::new(client_id.clone())],
         Utc::now() + Duration::seconds(60),
         Utc::now(),
-        resolve_claims(eth_provider, code_entry.address).await,
+        resolve_claims(
+            eth_provider,
+            code_entry.address,
+            code_entry.chain_id.unwrap_or(1),
+        )
+        .await,
         EmptyAdditionalClaims {},
     )
     .set_nonce(code_entry.nonce)
@@ -585,6 +592,7 @@ pub async fn sign_in(
         exchange_count: 0,
         client_id: params.client_id.clone(),
         auth_time: Utc::now(),
+        chain_id: Some(siwe_cookie.message.chain_id),
     };
 
     let mut new_session_entry = session_entry.clone();
@@ -745,7 +753,12 @@ pub async fn userinfo(
     };
 
     let response = CoreUserInfoClaims::new(
-        resolve_claims(eth_provider, code_entry.address).await,
+        resolve_claims(
+            eth_provider,
+            code_entry.address,
+            code_entry.chain_id.unwrap_or(1),
+        )
+        .await,
         EmptyAdditionalClaims::default(),
     )
     .set_issuer(Some(IssuerUrl::from_url(base_url.clone())))

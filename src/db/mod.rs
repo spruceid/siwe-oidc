@@ -27,6 +27,7 @@ pub struct CodeEntry {
     pub nonce: Option<Nonce>,
     pub client_id: String,
     pub auth_time: DateTime<Utc>,
+    pub chain_id: Option<u64>, // TODO temporary, for transition purposes
 }
 
 #[derive(Clone, Serialize, Deserialize)]
