@@ -10,15 +10,21 @@ Cloudflare Worker. They use the same code base and are selected at compile time
 
 You will need [`wrangler`](https://github.com/cloudflare/wrangler).
 
-Then copy the configuration file template:
+First, copy the configuration file template:
 ```bash
 cp wrangler_example.toml wrangler.toml
 ```
 
-Replacing the following fields:
+Then replace the following fields:
 - `account_id`: your Cloudflare account ID;
-- `zone_id`: (Optional) DNS zone ID; and
-- `kv_namespaces`: a KV namespace ID (created with `wrangler kv:namespace create SIWE_OIDC`).
+- `zone_id`: (Optional) DNS zone ID;
+- `kv_namespaces`: a KV namespace ID (created with `wrangler kv:namespace create SIWE_OIDC`); and
+- the environment variables under `vars`.
+
+You will also need to add a secret RSA key in PEM format:
+```
+wrangler secret put SIWEOIDC_RSA_PEM
+```
 
 At this point, you should be able to create/publish the worker:
 ```
