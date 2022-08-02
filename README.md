@@ -23,7 +23,7 @@ Then replace the following fields:
 
 You will also need to add a secret RSA key in PEM format:
 ```
-wrangler secret put SIWEOIDC_RSA_PEM
+wrangler secret put RSA_PEM
 ```
 
 At this point, you should be able to create/publish the worker:
