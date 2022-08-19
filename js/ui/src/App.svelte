@@ -70,7 +70,7 @@
 	let client_metadata = {};
 	onMount(async () => {
 		try {
-			client_metadata = JSON.parse(await fetch(`${window.location.origin}/client/${client_id}`));
+			client_metadata = fetch(`${window.location.origin}/client/${client_id}`).then((response) => response.json());
 		} catch (e) {
 			console.error(e);
 		}

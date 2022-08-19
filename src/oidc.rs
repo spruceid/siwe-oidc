@@ -689,10 +689,13 @@ async fn client_access(
 
 pub async fn clientinfo(
     client_id: String,
-    bearer: Option<Bearer>,
     db_client: &DBClientType,
 ) -> Result<CoreClientMetadata, CustomError> {
-    Ok(client_access(client_id, bearer, db_client).await?.metadata)
+    Ok(db_client
+        .get_client(client_id)
+        .await?
+        .ok_or(CustomError::NotFound)?
+        .metadata)
 }
 
 pub async fn client_delete(

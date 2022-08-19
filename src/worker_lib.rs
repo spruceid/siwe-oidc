@@ -255,15 +255,9 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 } else {
                     return Response::error("Bad Request", 400);
                 };
-                let bearer = req
-                    .headers()
-                    .get(Authorization::<Bearer>::name().as_str())?
-                    .and_then(|b| HeaderValue::from_str(b.as_ref()).ok())
-                    .as_ref()
-                    .and_then(Bearer::decode);
                 let url = req.url()?;
                 let db_client = CFClient { ctx, url };
-                match oidc::clientinfo(client_id, bearer, &db_client).await {
+                match oidc::clientinfo(client_id, &db_client).await {
                     Ok(r) => Ok(Response::from_json(&r)?),
                     Err(e) => e.into(),
                 }

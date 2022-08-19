@@ -211,14 +211,9 @@ async fn userinfo(
 
 async fn clientinfo(
     Path(client_id): Path<String>,
-    bearer: Option<TypedHeader<Authorization<Bearer>>>,
     Extension(redis_client): Extension<RedisClient>,
 ) -> Result<Json<CoreClientMetadata>, CustomError> {
-    Ok(
-        oidc::clientinfo(client_id, bearer.map(|b| b.0 .0), &redis_client)
-            .await?
-            .into(),
-    )
+    Ok(oidc::clientinfo(client_id, &redis_client).await?.into())
 }
 
 async fn client_update(
