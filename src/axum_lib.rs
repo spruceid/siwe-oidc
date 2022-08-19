@@ -248,20 +248,17 @@ pub async fn main() {
 
     let manager = RedisConnectionManager::new(config.redis_url.clone()).unwrap();
     let pool = bb8::Pool::builder().build(manager.clone()).await.unwrap();
-    // let pool2 = bb8::Pool::builder().build(manager).await.unwrap();
 
     let redis_client = RedisClient { pool };
 
-    // for (id, secret) in &config.default_clients.clone() {
-    //     let client_entry = ClientEntry {
-    //         secret: secret.to_string(),
-    //         redirect_uris: vec![],
-    //     };
-    //     redis_client
-    //         .set_client(id.to_string(), client_entry)
-    //         .await
-    //         .unwrap(); // TODO
-    // }
+    for (id, entry) in &config.default_clients.clone() {
+        let entry: ClientEntry =
+            serde_json::from_str(entry).expect("Deserialisation of ClientEntry failed");
+        redis_client
+            .set_client(id.to_string(), entry.clone())
+            .await
+            .unwrap(); // TODO
+    }
 
     let private_key = if let Some(key) = &config.rsa_pem {
         RsaPrivateKey::from_pkcs1_pem(key)

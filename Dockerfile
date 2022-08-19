@@ -35,6 +35,7 @@ WORKDIR /siwe-oidc
 RUN mkdir -p ./static
 COPY --from=node_builder /siwe-oidc/static/ ./static/
 COPY --from=builder /siwe-oidc/siwe-oidc.toml ./
+ENV SIWEOIDC_ADDRESS="0.0.0.0"
 EXPOSE 8000
 ENTRYPOINT ["siwe-oidc"]
 LABEL org.opencontainers.image.source https://github.com/spruceid/siwe-oidc

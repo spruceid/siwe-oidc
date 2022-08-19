@@ -61,7 +61,7 @@ Redis, or a Redis compatible database (e.g. MemoryDB in AWS), is required.
 The Docker image is available at `ghcr.io/spruceid/siwe_oidc:0.1.0`. Here is an
 example usage:
 ```bash
-docker run -p 8000:8000 -e SIWEOIDC_ADDRESS="0.0.0.0" -e SIWEOIDC_REDIS_URL="redis://redis" ghcr.io/spruceid/siwe_oidc:latest
+docker run -p 8000:8000 -e SIWEOIDC_REDIS_URL="redis://redis" ghcr.io/spruceid/siwe_oidc:latest
 ```
 
 It can be configured either with the `siwe-oidc.toml` configuration file, or
