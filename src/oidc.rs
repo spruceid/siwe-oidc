@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
-use cookie::Cookie;
+use cookie::{Cookie, SameSite};
 use ethers_core::{types::H160, utils::to_checksum};
 use headers::{self, authorization::Bearer};
 use hex::FromHex;
@@ -440,9 +440,7 @@ pub async fn authorize(
         )
         .await?;
     let session_cookie = Cookie::build(SESSION_COOKIE_NAME, session_id.to_string())
-        // .domain(base)
-        // .path("/")
-        .secure(true)
+        .same_site(SameSite::Strict)
         .http_only(true)
         .max_age(cookie::time::Duration::seconds(
             SESSION_LIFETIME.try_into().unwrap(),
