@@ -46,7 +46,7 @@ pub fn siwe() -> Html {
 #[derive(Deserialize)]
 struct CallbackParams {
     code: String,
-    _state: String,
+    // state: String,
 }
 
 #[function_component(Callback)]
@@ -71,7 +71,7 @@ pub fn callback() -> Html {
         let (_auth_url, _csrf_token, nonce) = client
             .authorize_url(
                 CoreAuthenticationFlow::AuthorizationCode,
-                CsrfToken::new_random,
+                || CsrfToken::new("state".to_string()),
                 || Nonce::new("nonce".to_string()),
             )
             .add_scope(Scope::new("openid".to_string()))
