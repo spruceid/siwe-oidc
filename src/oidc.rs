@@ -577,7 +577,7 @@ pub async fn sign_in(
         .map_err(|e| anyhow!("Failed signature validation: {}", e))?;
 
     let domain = params.redirect_uri.url();
-    if domain.to_string() != *siwe_cookie.message.resources.get(0).unwrap().to_string() {
+    if *domain != Url::from_str(siwe_cookie.message.resources.get(0).unwrap().as_ref()).unwrap() {
         return Err(anyhow!("Conflicting domains in message and redirect").into());
     }
     if session_entry.siwe_nonce != siwe_cookie.message.nonce {
