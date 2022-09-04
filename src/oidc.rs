@@ -282,7 +282,7 @@ pub async fn token(
     let core_id_token = CoreIdTokenClaims::new(
         IssuerUrl::from_url(base_url),
         vec![Audience::new(client_id.clone())],
-        Utc::now() + Duration::hours(2),
+        Utc::now() + Duration::hours(6),
         Utc::now(),
         resolve_claims(
             eth_provider,
