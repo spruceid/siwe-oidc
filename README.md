@@ -52,6 +52,9 @@ siweoidc.example.com/.w*
 
 ### Stand-Alone Binary
 
+> Note that currently the published Docker image doesn't support all wallets due
+> to the need of bundling secrets for web3modal at compile-time.
+
 #### Dependencies
 
 Redis, or a Redis compatible database (e.g. MemoryDB in AWS), is required.
@@ -111,7 +114,7 @@ A Docker Compose is available to test the IdP locally with Keycloak.
 
 1. You will first need to run:
 ```bash
-docker-compose up -d
+docker-compose -f test/docker-compose.yml up -d
 ```
 
 2. And then edit your `/etc/hosts` to have `siwe-oidc` point to `127.0.0.1`.
