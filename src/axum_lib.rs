@@ -7,7 +7,7 @@ use axum::{
     },
     response::{self, IntoResponse, Redirect},
     routing::{delete, get, get_service, post},
-    AddExtensionLayer, Json, Router,
+    Json, Router,
 };
 use bb8_redis::{bb8, RedisConnectionManager};
 use figment::{
@@ -25,7 +25,7 @@ use openidconnect::core::{
 };
 use rand::rngs::OsRng;
 use rsa::{
-    pkcs1::{FromRsaPrivateKey, ToRsaPrivateKey},
+    pkcs1::{DecodeRsaPrivateKey, EncodeRsaPrivateKey, LineEnding},
     RsaPrivateKey,
 };
 use std::net::SocketAddr;
@@ -130,8 +130,9 @@ async fn sign_in(
     Query(params): Query<oidc::SignInParams>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     Extension(redis_client): Extension<RedisClient>,
+    Extension(config): Extension<config::Config>,
 ) -> Result<Redirect, CustomError> {
-    let url = oidc::sign_in(params, cookies, &redis_client).await?;
+    let url = oidc::sign_in(&config.base_url, params, cookies, &redis_client).await?;
     Ok(Redirect::to(
         url.as_str()
             .parse()
@@ -273,7 +274,7 @@ pub async fn main() {
             .unwrap();
 
         info!("Generated key.");
-        info!("{:?}", private.to_pkcs1_pem().unwrap());
+        info!("{:?}", private.to_pkcs1_pem(LineEnding::LF).unwrap());
         private
     };
 
@@ -355,9 +356,9 @@ pub async fn main() {
         .route(&format!("{}/:id", oidc::CLIENT_PATH), post(client_update))
         .route(oidc::SIGNIN_PATH, get(sign_in))
         .route("/health", get(healthcheck))
-        .layer(AddExtensionLayer::new(private_key))
-        .layer(AddExtensionLayer::new(config.clone()))
-        .layer(AddExtensionLayer::new(redis_client))
+        .layer(Extension(private_key))
+        .layer(Extension(config.clone()))
+        .layer(Extension(redis_client))
         .layer(TraceLayer::new_for_http());
 
     let addr = SocketAddr::from((config.address, config.port));

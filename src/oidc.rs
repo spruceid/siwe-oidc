@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
 use cookie::{Cookie, SameSite};
 use ethers_core::{types::H160, utils::to_checksum};
+use ethers_providers::{Http, Middleware, Provider};
 use headers::{self, authorization::Bearer};
 use hex::FromHex;
 use iri_string::types::UriString;
@@ -23,9 +24,12 @@ use openidconnect::{
     ResponseTypes, Scope, StandardClaims, SubjectIdentifier, TokenUrl, UserInfoUrl,
 };
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use rsa::{pkcs1::ToRsaPrivateKey, RsaPrivateKey};
+use rsa::{
+    pkcs1::{EncodeRsaPrivateKey, LineEnding},
+    RsaPrivateKey,
+};
 use serde::{Deserialize, Serialize};
-use siwe::{Message, TimeStamp, Version};
+use siwe::{Message, TimeStamp, VerificationOpts, Version};
 use std::{str::FromStr, time};
 use thiserror::Error;
 use tracing::{error, info};
@@ -88,7 +92,7 @@ pub enum CustomError {
 
 fn jwk(private_key: RsaPrivateKey) -> Result<CoreRsaPrivateSigningKey> {
     let pem = private_key
-        .to_pkcs1_pem()
+        .to_pkcs1_pem(LineEnding::LF)
         .map_err(|e| anyhow!("Failed to serialise key as PEM: {}", e))?;
     CoreRsaPrivateSigningKey::from_pem(&pem, Some(JsonWebKeyId::new(KID.to_string())))
         .map_err(|e| anyhow!("Invalid RSA private key: {}", e))
@@ -167,31 +171,53 @@ pub fn metadata(base_url: Url) -> Result<CoreProviderMetadata, CustomError> {
     Ok(pm)
 }
 
-async fn resolve_name(eth_provider: Option<Url>, address: H160) -> String {
-    let address_string = to_checksum(&address, None);
-    if eth_provider.is_none() {
-        return address_string;
-    }
-
-    use ethers_providers::{Http, Middleware, Provider};
-    let provider = match Provider::<Http>::try_from(eth_provider.unwrap().to_string()) {
-        Ok(p) => p,
+fn build_provider(eth_provider: Url) -> Result<Provider<Http>> {
+    match Provider::<Http>::try_from(eth_provider.to_string()) {
+        Ok(p) => Ok(p),
         Err(e) => {
             error!("Failed to initialise Eth provider: {}", e);
-            return address_string;
-        }
-    };
-    match provider.lookup_address(address).await {
-        Ok(n) => n,
-        Err(e) => {
-            error!("Failed to resolve Eth domain: {}", e);
-            address_string
+            Err(e)?
         }
     }
 }
 
-async fn resolve_avatar(_eth_provider: Option<Url>, _address: H160) -> Option<Url> {
-    None
+async fn resolve_name(eth_provider: Option<Url>, address: H160) -> Result<String, String> {
+    let address_string = to_checksum(&address, None);
+    let eth_provider = if let Some(p) = eth_provider {
+        p
+    } else {
+        return Err(address_string);
+    };
+    let provider = if let Ok(p) = build_provider(eth_provider) {
+        p
+    } else {
+        return Err(address_string);
+    };
+    match provider.lookup_address(address).await {
+        Ok(n) => Ok(n),
+        Err(e) => {
+            error!("Failed to resolve Eth domain: {}", e);
+            Err(address_string)
+        }
+    }
+}
+
+async fn resolve_avatar(eth_provider: Option<Url>, ens_name: &str) -> Option<Url> {
+    if let Some(provider) = eth_provider {
+        if let Ok(p) = build_provider(provider) {
+            match p.resolve_avatar(ens_name).await {
+                Ok(a) => Some(a),
+                Err(e) => {
+                    error!("Could not resolve avatar: {}", e);
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    }
 }
 
 async fn resolve_claims(
@@ -204,11 +230,17 @@ async fn resolve_claims(
         chain_id,
         to_checksum(&address, None)
     ));
+    let ens_name = resolve_name(eth_provider.clone(), address).await;
+    let username = match ens_name.clone() {
+        Ok(n) | Err(n) => n,
+    };
+    let avatar = match ens_name {
+        Ok(n) => resolve_avatar(eth_provider.clone(), &n).await,
+        Err(_) => None,
+    };
     StandardClaims::new(subject_id)
-        .set_preferred_username(Some(EndUserUsername::new(
-            resolve_name(eth_provider.clone(), address).await,
-        )))
-        .set_picture(resolve_avatar(eth_provider, address).await.map(|a| {
+        .set_preferred_username(Some(EndUserUsername::new(username)))
+        .set_picture(avatar.map(|a| {
             let mut avatar_localized = LocalizedClaim::new();
             avatar_localized.insert(None, EndUserPictureUrl::new(a.to_string()));
             avatar_localized
@@ -296,7 +328,7 @@ pub async fn token(
     .set_auth_time(Some(code_entry.auth_time));
 
     let pem = private_key
-        .to_pkcs1_pem()
+        .to_pkcs1_pem(LineEnding::LF)
         .map_err(|e| anyhow!("Failed to serialise key as PEM: {}", e))?;
 
     let id_token = CoreIdToken::new(
@@ -519,6 +551,7 @@ pub struct SignInParams {
 }
 
 pub async fn sign_in(
+    base_url: &Url,
     params: SignInParams,
     // cookies_header: String,
     cookies: headers::Cookie,
@@ -572,16 +605,33 @@ pub async fn sign_in(
         .to_eip4361_message()
         .map_err(|e| anyhow!("Failed to serialise message: {}", e))?;
     info!("{}", message);
+
+    let domain = if let Some(d) = base_url.domain() {
+        match d.try_into() {
+            Ok(dd) => Some(dd),
+            Err(e) => {
+                error!("Failed to translate domain into authority: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
     message
-        .verify(signature)
-        .map_err(|e| anyhow!("Failed signature validation: {}", e))?;
+        .verify(
+            &signature,
+            &VerificationOpts {
+                domain,
+                nonce: Some(session_entry.siwe_nonce.clone()),
+                timestamp: None,
+            },
+        )
+        .await
+        .map_err(|e| anyhow!("Failed message verification: {}", e))?;
 
     let domain = params.redirect_uri.url();
     if *domain != Url::from_str(siwe_cookie.message.resources.get(0).unwrap().as_ref()).unwrap() {
         return Err(anyhow!("Conflicting domains in message and redirect").into());
-    }
-    if session_entry.siwe_nonce != siwe_cookie.message.nonce {
-        return Err(anyhow!("Conflicting nonces in message and session").into());
     }
 
     let code_entry = CodeEntry {
@@ -773,5 +823,31 @@ pub async fn userinfo(
                     .map_err(|_| anyhow!("Error signing response."))?,
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_log::test;
+
+    #[test(tokio::test)]
+    async fn test_claims() {
+        let res = resolve_claims(
+            Some("https://cloudflare-eth.com".try_into().unwrap()),
+            <[u8; 20]>::from_hex("d8da6bf26964af9d7eed9e03e53415d37aa96045")
+                .unwrap()
+                .into(),
+            1,
+        )
+        .await;
+        assert_eq!(
+            res.preferred_username().map(|u| u.to_string()),
+            Some("vitalik.eth".to_string())
+        );
+        assert_eq!(
+            res.picture().map(|u| u.get(None).unwrap().as_str()),
+            Some("https://ipfs.io/ipfs/QmSP4nq9fnN9dAiCj42ug9Wa79rqmQerZXZch82VqpiH7U/image.gif")
+        );
     }
 }
