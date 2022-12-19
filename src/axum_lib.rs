@@ -7,7 +7,7 @@ use axum::{
     },
     response::{self, IntoResponse, Redirect},
     routing::{delete, get, get_service, post},
-    AddExtensionLayer, Json, Router,
+    Json, Router,
 };
 use bb8_redis::{bb8, RedisConnectionManager};
 use figment::{
@@ -356,9 +356,9 @@ pub async fn main() {
         .route(&format!("{}/:id", oidc::CLIENT_PATH), post(client_update))
         .route(oidc::SIGNIN_PATH, get(sign_in))
         .route("/health", get(healthcheck))
-        .layer(AddExtensionLayer::new(private_key))
-        .layer(AddExtensionLayer::new(config.clone()))
-        .layer(AddExtensionLayer::new(redis_client))
+        .layer(Extension(private_key))
+        .layer(Extension(config.clone()))
+        .layer(Extension(redis_client))
         .layer(TraceLayer::new_for_http());
 
     let addr = SocketAddr::from((config.address, config.port));
