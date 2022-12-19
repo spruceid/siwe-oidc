@@ -25,7 +25,7 @@ use openidconnect::core::{
 };
 use rand::rngs::OsRng;
 use rsa::{
-    pkcs1::{FromRsaPrivateKey, ToRsaPrivateKey},
+    pkcs1::{DecodeRsaPrivateKey, EncodeRsaPrivateKey, LineEnding},
     RsaPrivateKey,
 };
 use std::net::SocketAddr;
@@ -130,8 +130,9 @@ async fn sign_in(
     Query(params): Query<oidc::SignInParams>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
     Extension(redis_client): Extension<RedisClient>,
+    Extension(config): Extension<config::Config>,
 ) -> Result<Redirect, CustomError> {
-    let url = oidc::sign_in(params, cookies, &redis_client).await?;
+    let url = oidc::sign_in(&config.base_url, params, cookies, &redis_client).await?;
     Ok(Redirect::to(
         url.as_str()
             .parse()
@@ -273,7 +274,7 @@ pub async fn main() {
             .unwrap();
 
         info!("Generated key.");
-        info!("{:?}", private.to_pkcs1_pem().unwrap());
+        info!("{:?}", private.to_pkcs1_pem(LineEnding::LF).unwrap());
         private
     };
 

@@ -4,7 +4,7 @@ use headers::{
     authorization::{Basic, Bearer, Credentials},
     Authorization, ContentType, Header, HeaderValue,
 };
-use rsa::{pkcs1::FromRsaPrivateKey, RsaPrivateKey};
+use rsa::{pkcs1::DecodeRsaPrivateKey, RsaPrivateKey};
 use worker::*;
 
 use super::db::CFClient;
@@ -324,8 +324,9 @@ pub async fn main(req: Request, env: Env) -> Result<Response> {
                 return Response::error("Missing cookies", 400);
             }
             let url = req.url()?;
+            let base_url = ctx.var(BASE_URL_KEY)?.to_string().parse().unwrap();
             let db_client = CFClient { ctx, url };
-            match oidc::sign_in(params, cookies.unwrap(), &db_client).await {
+            match oidc::sign_in(&base_url, params, cookies.unwrap(), &db_client).await {
                 Ok(url) => Response::redirect(url),
                 Err(e) => e.into(),
             }
