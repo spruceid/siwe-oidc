@@ -56,7 +56,8 @@ matchit = "0.4.2"
 serde_urlencoded = "0.7.0"
 uuid = { version = "0.8", features = ["serde", "v4", "wasm-bindgen"] }
 wee_alloc = { version = "0.4" }
-worker = "0.0.9"
+worker = "0.0.12"
+time = { version = "0.3.17", features = ["wasm-bindgen"] }
 
 [profile.release]
 opt-level = "z"
