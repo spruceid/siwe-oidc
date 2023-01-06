@@ -39,7 +39,7 @@ axum = { version = "0.4.3", features = ["headers"] }
 # axum-debug = "0.3.2"
 chrono = "0.4.19"
 figment = { version = "0.10.6", features = ["toml", "env"] }
-tokio = { version = "1.14.0", features = ["full"] }
+tokio = { version = "1.23.1", features = ["full"] }
 tower-http = { version = "0.2.0", features = ["fs", "trace", "cors"] }
 tracing-subscriber = { version = "0.3.2", features = ["env-filter"] }
 bb8-redis = "0.10.1"
@@ -66,7 +66,7 @@ lto = true
 [dev-dependencies]
 env_logger = "0.10.0"
 test-log = "0.2.11"
-tokio = { version = "1.14.0", features = ["macros", "rt"] }
+tokio = { version = "1.23.1", features = ["macros", "rt"] }
 
 # [target.'cfg(target_arch = "wasm32")'.profile.release]
 # opt-level = "z"
