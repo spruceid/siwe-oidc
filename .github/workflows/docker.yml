@@ -14,7 +14,7 @@ jobs:
     - name: Build and push image
       uses: elgohr/Publish-Docker-Github-Action@master
       with:
-        name: spruceid/siwe_oidc
+        name: bounds/siwe_oidc
         username: ${{ github.actor }}
         password: ${{ secrets.GH_PACKAGE_PUSH_TOKEN }}
         registry: ghcr.io
