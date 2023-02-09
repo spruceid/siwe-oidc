@@ -12,11 +12,11 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: Build and push image
-      uses: elgohr/Publish-Docker-Github-Action@master
+      uses: elgohr/Publish-Docker-Github-Action@v5
       with:
         name: bounds/siwe_oidc
         username: ${{ github.actor }}
-        password: ${{ secrets.GH_PACKAGE_PUSH_TOKEN }}
+        password: ${{ secrets.GITHUB_TOKEN }}
         registry: ghcr.io
         tag_names: true
         tag_semver: true
