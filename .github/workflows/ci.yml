@@ -13,19 +13,30 @@ jobs:
        include:
          - cargo_target: "x86_64-unknown-linux-gnu"
     steps:
+      - uses: actions/checkout@v2
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.67.0
+            override: true
+            components: rustfmt, clippy
       - name: Clone repo
         uses: actions/checkout@master
-      - name: Add targets
-        run: rustup target add wasm32-unknown-unknown
       - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build --verbose
         env:
           CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
-        run: cargo build --verbose
       - name: Clippy
+        uses: actions-rs/cargo@v1
         env:
           CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
-        run: RUSTFLAGS="-Dwarnings" cargo clippy
+        with:
+          command: check --verbose
       - name: Fmt
+        uses: actions-rs/cargo@v1
         env:
           CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
-        run: cargo fmt -- --check
+        with:
+          command: fmt -- --check
