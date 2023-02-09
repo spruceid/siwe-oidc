@@ -16,7 +16,7 @@ headers = "0.3.6"
 hex = "0.4.3"
 iri-string = { version = "0.6", features = ["serde"] }
 # openidconnect = "2.1.2"
-openidconnect = { git = "https://github.com/sbihel/openidconnect-rs", branch = "replace-ring", default-features = false, features = ["reqwest", "rustls-tls"] }
+openidconnect = { git = "https://github.com/ramosbugs/openidconnect-rs", branch = "main", default-features = false, features = ["reqwest", "rustls-tls"] }
 rand = "0.8.4"
 rsa = { version = "0.7.0" }
 serde = { version = "1.0", features = ["derive"] }
