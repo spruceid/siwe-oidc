@@ -1,4 +1,4 @@
-FROM clux/muslrust:1.57.0 as chef
+FROM clux/muslrust:stable as chef
 WORKDIR /siwe-oidc
 RUN cargo install cargo-chef
 
