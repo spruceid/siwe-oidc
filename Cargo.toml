@@ -38,7 +38,7 @@ lazy_static = "1.4"
 axum = { version = "0.4.3", features = ["headers"] }
 chrono = "0.4.19"
 figment = { version = "0.10.6", features = ["toml", "env"] }
-tokio = { version = "1.14.0", features = ["full"] }
+tokio = { version = "1.24.2", features = ["full"] }
 tower-http = { version = "0.2.0", features = ["fs", "trace", "cors"] }
 tracing-subscriber = { version = "0.3.2", features = ["env-filter"] }
 bb8-redis = "0.10.1"
@@ -61,7 +61,7 @@ lto = true
 [dev-dependencies]
 env_logger = "0.10.0"
 test-log = "0.2.11"
-tokio = { version = "1.14.0", features = ["macros", "rt"] }
+tokio = { version = "1.24.2", features = ["macros", "rt"] }
 ethers-signers = "1.0.2"
 
 [package.metadata.wasm-pack.profile.profiling]
