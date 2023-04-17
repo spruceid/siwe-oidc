@@ -37,5 +37,5 @@ jobs:
         run: cargo fmt -- --check
 
       - name: Test
-        if: matrix.cargo_target == "x86_64-unknown-linux-gnu"
+        if: matrix.cargo_target == 'x86_64-unknown-linux-gnu'
         run: cargo test
