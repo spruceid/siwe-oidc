@@ -15,12 +15,12 @@ anyhow = "1.0.53"
 headers = "0.3.6"
 hex = "0.4.3"
 iri-string = { version = "0.6", features = ["serde"] }
-# openidconnect = "2.1.2"
-openidconnect = { git = "https://github.com/sbihel/openidconnect-rs", branch = "replace-ring", default-features = false, features = ["reqwest", "rustls-tls"] }
+openidconnect = "3.0.0"
 rand = "0.8.4"
 rsa = { version = "0.7.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.78"
+serde_urlencoded = "0.7.0"
 siwe = "0.5.0"
 thiserror = "1.0.30"
 tracing = "0.1.30"
@@ -36,7 +36,6 @@ lazy_static = "1.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 axum = { version = "0.4.3", features = ["headers"] }
-# axum-debug = "0.3.2"
 chrono = "0.4.19"
 figment = { version = "0.10.6", features = ["toml", "env"] }
 tokio = { version = "1.14.0", features = ["full"] }
@@ -46,14 +45,10 @@ bb8-redis = "0.10.1"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-# cached = { version = "0.26", default-features = false }
 chrono = { version = "0.4.19", features = ["wasmbind"] }
 console_error_panic_hook = { version = "0.1" }
-# console_log = "0.2"
 getrandom = { version = "0.2", features = ["js"] }
-# log = "0.4"
 matchit = "0.4.2"
-serde_urlencoded = "0.7.0"
 uuid = { version = "0.8", features = ["serde", "v4", "wasm-bindgen"] }
 wee_alloc = { version = "0.4" }
 worker = "0.0.12"
@@ -67,13 +62,7 @@ lto = true
 env_logger = "0.10.0"
 test-log = "0.2.11"
 tokio = { version = "1.14.0", features = ["macros", "rt"] }
-
-# [target.'cfg(target_arch = "wasm32")'.profile.release]
-# opt-level = "z"
-
-# [target.'cfg(target_arch = "wasm32")'.profile.debug]
-# opt-level = "z"
-# lto = false
+ethers-signers = "1.0.2"
 
 [package.metadata.wasm-pack.profile.profiling]
 wasm-opt = ['-g', '-O']

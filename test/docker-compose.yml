@@ -24,6 +24,11 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
 
   redis:
-    image: redis:6-alpine
+    image: redis
+    healthcheck:
+      test: ["CMD", "redis-cli","ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "6379:6379"

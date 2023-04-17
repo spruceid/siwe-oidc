@@ -1,12 +1,29 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use bb8_redis::{bb8::Pool, redis::AsyncCommands, RedisConnectionManager};
+use bb8_redis::{
+    bb8::{self, Pool},
+    redis::AsyncCommands,
+    RedisConnectionManager,
+};
+use url::Url;
 
 use super::*;
 
 #[derive(Clone)]
 pub struct RedisClient {
-    pub pool: Pool<RedisConnectionManager>,
+    pool: Pool<RedisConnectionManager>,
+}
+
+impl RedisClient {
+    pub async fn new(url: &Url) -> Result<Self> {
+        let manager = RedisConnectionManager::new(url.clone())
+            .context("Could not build Redis connection manager")?;
+        let pool = bb8::Pool::builder()
+            .build(manager.clone())
+            .await
+            .context("Coud not build Redis pool")?;
+        Ok(Self { pool })
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]

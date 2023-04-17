@@ -4,6 +4,7 @@ on: push
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
 
 jobs:
   build:
@@ -15,18 +16,26 @@ jobs:
          - cargo_target: "wasm32-unknown-unknown"
     steps:
       - name: Clone repo
-        uses: actions/checkout@master
+        uses: actions/checkout@v3
       - name: Add targets
         run: rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Docker Compose
+        run: docker-compose -f test/docker-compose.yml up -d redis
+
       - name: Build
         env:
           CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
-        run: cargo build --verbose
+        run: cargo build
       - name: Clippy
         env:
           CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
-        run: RUSTFLAGS="-Dwarnings" cargo clippy
+        run: cargo clippy
       - name: Fmt
         env:
           CARGO_BUILD_TARGET: ${{ matrix.cargo_target }}
         run: cargo fmt -- --check
+
+      - name: Test
+        if: matrix.cargo_target == 'x86_64-unknown-linux-gnu'
+        run: cargo test

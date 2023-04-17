@@ -31,15 +31,15 @@ macro_rules! json_bad_request {
 impl From<CustomError> for Result<Response> {
     fn from(error: CustomError) -> Self {
         match error {
-            CustomError::BadRequest(_) => Response::error(&error.to_string(), 400),
+            CustomError::BadRequest(_) => Response::error(error.to_string(), 400),
             CustomError::BadRequestRegister(e) => {
                 Response::from_json(&e).map(|r| r.with_status(400))
             }
             CustomError::BadRequestToken(e) => Response::from_json(&e).map(|r| r.with_status(400)),
-            CustomError::Unauthorized(_) => Response::error(&error.to_string(), 401),
-            CustomError::NotFound => Response::error(&error.to_string(), 404),
+            CustomError::Unauthorized(_) => Response::error(error.to_string(), 401),
+            CustomError::NotFound => Response::error(error.to_string(), 404),
             CustomError::Redirect(uri) => Response::redirect(uri.parse().unwrap()),
-            CustomError::Other(_) => Response::error(&error.to_string(), 500),
+            CustomError::Other(_) => Response::error(error.to_string(), 500),
         }
     }
 }
