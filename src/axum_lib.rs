@@ -9,7 +9,6 @@ use axum::{
     routing::{delete, get, get_service, post},
     Json, Router,
 };
-use bb8_redis::{bb8, RedisConnectionManager};
 use figment::{
     providers::{Env, Format, Serialized, Toml},
     Figment,
@@ -247,10 +246,9 @@ pub async fn main() {
 
     tracing_subscriber::fmt::init();
 
-    let manager = RedisConnectionManager::new(config.redis_url.clone()).unwrap();
-    let pool = bb8::Pool::builder().build(manager.clone()).await.unwrap();
-
-    let redis_client = RedisClient { pool };
+    let redis_client = RedisClient::new(&config.redis_url)
+        .await
+        .expect("Could not build Redis client");
 
     for (id, entry) in &config.default_clients.clone() {
         let entry: ClientEntry =
