@@ -26,7 +26,7 @@ jobs:
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: |
             ghcr.io/devfolioco/siwe-oidc:${{ github.event.release.tag_name }}
             ghcr.io/devfolioco/siwe-oidc:latest
