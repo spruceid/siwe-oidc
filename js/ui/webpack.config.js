@@ -96,7 +96,7 @@ module.exports = {
 		new MiniCssExtractPlugin({
 			filename: '[name].css'
 		}),
-		new webpack.EnvironmentPlugin(prod ? ['INFURA_ID', 'PORTIS_ID', 'FORTMATIC_KEY'] : []),
+		new webpack.EnvironmentPlugin(prod ? ['INFURA_ID'] : []),
 	],
 	devtool: prod ? false : 'source-map',
 	devServer: {
