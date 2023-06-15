@@ -6,7 +6,7 @@
 	import { arbitrum, mainnet, polygon } from '@wagmi/core/chains';
 	import { getAccount } from '@wagmi/core';
 	import { SiweMessage } from 'siwe';
-	import Cookies from 'js-cookie';
+	import Cookies from 'js-cookies';
 
 	// TODO: REMOVE DEFAULTS:
 	// main.ts will parse the params from the server
