@@ -18,9 +18,6 @@
 	export let client_id: string;
 	const projectId: string = process.env.PROJECT_ID;
 
-	// Could be exposed in the future.
-	export let useENS: boolean = true;
-
 	$: status = 'Not Logged In';
 
 	const chains = [arbitrum, mainnet, polygon];
