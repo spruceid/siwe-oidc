@@ -65,9 +65,9 @@
 	});
 </script>
 
-<div class="bg-gray-bg h-full w-full flex flex-col items-center font-nunito justify-start">
-	<img src="/img/devfolio-logo-full.svg" alt="Devfolio logo" height={36} width={174} class="mt-10 md:mt-16"/>
-	<div class="w-full md:w-[476px] bg-white md:rounded-2xl md:shadow-blue-1 p-8 mt-10">
+<div class="bg-white md:bg-gray-bg h-full w-full flex flex-col items-center font-nunito justify-start">
+	<img src="/img/devfolio-logo-full.svg" alt="Devfolio logo" height={36} width={174} class="mt-10 h-[27px] w-[135px] md:h-[36px] md:w-[174px] md:mt-16"/>
+	<div class="w-full md:w-[476px] bg-white md:rounded-2xl md:shadow-blue-1 pt-2 md:pt-8 p-8 mt-10">
 		<h1 class=" text-2xl font-extrabold text-black">Sign in with Ethereum</h1>
 		<p class="mt-1 text-base font-normal text-gray-7">Continue below to sign to Devfolio</p>
 
