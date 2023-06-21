@@ -8,7 +8,7 @@ const prod = mode === 'production';
 
 module.exports = {
 	entry: {
-		'build/bundle': ['./src/main.ts']
+		'bundle': ['./src/main.ts']
 	},
 	resolve: {
 		alias: {
@@ -31,8 +31,11 @@ module.exports = {
 			// util: false,
 		}
 	},
+	optimization: {
+	  runtimeChunk: 'single',
+	},
 	output: {
-		path: path.join(__dirname, '../../static'),
+		path: path.join(__dirname, '../../static/build'),
 		filename: '[name].js',
 		chunkFilename: '[name].[id].js'
 	},
