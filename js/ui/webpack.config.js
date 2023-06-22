@@ -36,6 +36,7 @@ module.exports = {
 	},
 	output: {
 		path: path.join(__dirname, '../../static/build'),
+		publicPath: "/build/",
 		filename: '[name].js',
 		chunkFilename: '[name].[id].js'
 	},
