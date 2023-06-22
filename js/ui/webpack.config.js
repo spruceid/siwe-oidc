@@ -8,7 +8,7 @@ const prod = mode === 'production';
 
 module.exports = {
 	entry: {
-		'build/bundle': ['./src/main.ts']
+		'bundle': ['./src/main.ts']
 	},
 	resolve: {
 		alias: {
@@ -31,8 +31,12 @@ module.exports = {
 			// util: false,
 		}
 	},
+	optimization: {
+	  runtimeChunk: 'single',
+	},
 	output: {
-		path: path.join(__dirname, '../../static'),
+		path: path.join(__dirname, '../../static/build'),
+		publicPath: "/build/",
 		filename: '[name].js',
 		chunkFilename: '[name].[id].js'
 	},
@@ -96,7 +100,7 @@ module.exports = {
 		new MiniCssExtractPlugin({
 			filename: '[name].css'
 		}),
-		new webpack.EnvironmentPlugin(prod ? ['INFURA_ID', 'PORTIS_ID', 'FORTMATIC_KEY'] : []),
+		new webpack.EnvironmentPlugin(prod ? ['PROJECT_ID'] : []),
 	],
 	devtool: prod ? false : 'source-map',
 	devServer: {

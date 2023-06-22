@@ -1,11 +1,12 @@
 <script lang="ts">
-	import Portis from '@portis/web3';
-	import { Client } from '@spruceid/siwe-web3modal';
-	import Torus from '@toruslabs/torus-embed';
-	import WalletConnectProvider from '@walletconnect/web3-provider';
-	import Fortmatic from 'fortmatic';
 	import { onMount } from 'svelte';
-	import CoinbaseWalletSDK from "@coinbase/wallet-sdk";
+	import { EthereumClient, w3mConnectors, w3mProvider } from '@web3modal/ethereum';
+	import { Web3Modal } from '@web3modal/html';
+	import { configureChains, createConfig } from '@wagmi/core';
+	import { arbitrum, mainnet, polygon } from '@wagmi/core/chains';
+	import { getAccount } from '@wagmi/core';
+	import { SiweMessage } from 'siwe';
+	import Cookies from 'js-cookie';
 
 	// TODO: REMOVE DEFAULTS:
 	// main.ts will parse the params from the server
@@ -15,57 +16,20 @@
 	export let state: string;
 	export let oidc_nonce: string;
 	export let client_id: string;
-
-	// Could be exposed in the future.
-	export let useENS: boolean = true;
+	const projectId: string = process.env.PROJECT_ID;
 
 	$: status = 'Not Logged In';
 
-	let client = new Client({
-		session: {
-			domain: window.location.host,
-			uri: window.location.origin,
-			useENS,
-			version: '1',
-			// TODO: Vet this as the default statement.
-			statement: `You are signing-in to ${domain}.`,
-			resources: [redirect],
-		},
-		modal: {
-			theme: 'dark',
-			providerOptions: {
-				walletconnect: {
-					package: WalletConnectProvider,
-					options: {
-						infuraId: process.env.INFURA_ID,
-						pollingInterval: 100000,
-					},
-				},
-				torus: {
-					package: Torus,
-				},
-				portis: {
-					package: Portis,
-					options: {
-						id: process.env.PORTIS_ID,
-					},
-				},
-				fortmatic: {
-					package: Fortmatic,
-					options: {
-						key: process.env.FORTMATIC_KEY,
-					},
-				},
-				walletlink: {
-					package: CoinbaseWalletSDK,
-					options: {
-						appName: "Sign-In with Ethereum",
-						infuraId: process.env.INFURA_ID
-					}
-				},
-			},
-		},
+	const chains = [arbitrum, mainnet, polygon];
+
+	const { publicClient } = configureChains(chains, [w3mProvider({ projectId })]);
+	const wagmiConfig = createConfig({
+		autoConnect: true,
+		connectors: w3mConnectors({ projectId, version: 1, chains }),
+		publicClient,
 	});
+	const ethereumClient = new EthereumClient(wagmiConfig, chains);
+	const web3modal = new Web3Modal({ projectId }, ethereumClient);
 
 	let client_metadata = {};
 	onMount(async () => {
@@ -75,19 +39,58 @@
 			console.error(e);
 		}
 	});
+	web3modal.subscribeModal(async () => {
+		const account = getAccount();
+		if (account.isConnected) {
+			try {
+				const expirationTime = new Date(
+					new Date().getTime() + (2 * 24 * 60 * 60 * 1000) // 48h
+				);
+				const signMessage = new SiweMessage({
+					domain: window.location.host,
+					address: account.address,
+					chainId: await account.connector.getChainId(),
+					expirationTime: expirationTime.toISOString(),
+					uri: window.location.origin,
+					version: '1',
+					statement: `You are signing-in to ${window.location.host}.`,
+					nonce,
+					resources: [redirect],
+				}).prepareMessage();
+
+				const signature = await (
+					await account.connector.getWalletClient()
+				).signMessage({
+					account: account.address,
+					message: signMessage,
+				});
+
+				const message = new SiweMessage(signMessage);
+				const session = {
+					message,
+					raw: signMessage,
+					signature,
+				};
+				Cookies.set('siwe', JSON.stringify(session), {
+					expires: expirationTime,
+				});
+
+				window.location.replace(
+					`/sign_in?redirect_uri=${encodeURI(redirect)}&state=${encodeURI(state)}&client_id=${encodeURI(
+						client_id,
+					)}${encodeURI(oidc_nonce_param)}`,
+				);
+				return;
+			} catch (e) {
+				console.error(e);
+			}
+		}
+	});
 
 	let oidc_nonce_param = '';
 	if (oidc_nonce != null && oidc_nonce != '') {
 		oidc_nonce_param = `&oidc_nonce=${oidc_nonce}`;
 	}
-	client.on('signIn', (result) => {
-		console.log(result);
-		window.location.replace(
-			`/sign_in?redirect_uri=${encodeURI(redirect)}&state=${encodeURI(state)}&client_id=${encodeURI(
-				client_id,
-			)}${encodeURI(oidc_nonce_param)}`,
-		);
-	});
 </script>
 
 <div
@@ -111,9 +114,7 @@
 		<button
 			class="h-12 border hover:scale-105 justify-evenly shadow-xl border-white mt-4 duration-100 ease-in-out transition-all transform flex items-center"
 			on:click={() => {
-				client.signIn(nonce).catch((e) => {
-					console.error(e);
-				});
+				web3modal.openModal();
 			}}
 		>
 			<svg

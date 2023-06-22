@@ -6,6 +6,10 @@ Two versions are available, a stand-alone binary (using Axum and Redis) and a
 Cloudflare Worker. They use the same code base and are selected at compile time
 (compiling for `wasm32` will make the Worker version).
 
+> The front-end depends on WalletConnect, meaning you will need to create a
+> project with them and have the environment variable `PROJECT_ID` set when you
+> build the front-end.
+
 ### Cloudflare Worker
 
 You will need [`wrangler`](https://github.com/cloudflare/wrangler).
@@ -52,8 +56,9 @@ siweoidc.example.com/.w*
 
 ### Stand-Alone Binary
 
-> Note that currently the published Docker image doesn't support all wallets due
-> to the need of bundling secrets for web3modal at compile-time.
+> **WARNING - ** Due to the reliance on WalletConnect, and the project ID being
+> loaded at compile-time, the current version of the Docker image won't have a
+> working web app.
 
 #### Dependencies
 
