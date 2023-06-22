@@ -6,7 +6,7 @@
 	import { arbitrum, mainnet, polygon } from '@wagmi/core/chains';
 	import { getAccount } from '@wagmi/core';
 	import { SiweMessage } from 'siwe';
-	import Cookies from 'js-cookies';
+	import Cookies from 'js-cookie';
 
 	// TODO: REMOVE DEFAULTS:
 	// main.ts will parse the params from the server
@@ -43,11 +43,14 @@
 		const account = getAccount();
 		if (account.isConnected) {
 			try {
+				const expirationTime = new Date(
+					new Date().getTime() + (2 * 24 * 60 * 60 * 1000) // 48h
+				);
 				const signMessage = new SiweMessage({
 					domain: window.location.host,
 					address: account.address,
 					chainId: await account.connector.getChainId(),
-					expirationTime: new Date(2 * 24 * 60 * 60 * 1000).toISOString(), // 48h
+					expirationTime: expirationTime.toISOString(),
 					uri: window.location.origin,
 					version: '1',
 					statement: `You are signing-in to ${window.location.host}.`,
@@ -69,7 +72,7 @@
 					signature,
 				};
 				Cookies.set('siwe', JSON.stringify(session), {
-					expires: message.expirationTime,
+					expires: expirationTime,
 				});
 
 				window.location.replace(
