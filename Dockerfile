@@ -19,17 +19,16 @@ FROM node:16-alpine as node_builder
 RUN apk add --no-cache --virtual .build-deps alpine-sdk python3
 
 ARG INFURA_ID
+ARG WALLET_CONNECT_ID
 
-ENV FORTMATIC_KEY=""
 ENV INFURA_ID=${INFURA_ID}
-ENV PORTIS_ID=""
-
+ENV WALLET_CONNECT_ID=${WALLET_CONNECT_ID}
 
 ADD --chown=node:node ./static /siwe-oidc/static
 ADD --chown=node:node ./js/ui /siwe-oidc/js/ui
 WORKDIR /siwe-oidc/js/ui
-RUN npm install
-RUN npm run build
+RUN yarn
+RUN yarn build
 
 FROM chef as builder
 COPY --from=dep_cacher /siwe-oidc/target/ ./target/

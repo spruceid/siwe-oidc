@@ -32,6 +32,7 @@ jobs:
             ghcr.io/devfolioco/siwe-oidc:latest
           build-args: |
             INFURA_ID=${{ secrets.INFURA_ID }}
+            WALLET_CONNECT_ID=${{ secrets.WALLET_CONNECT_ID }}
       - name: Build and push Pre-Release
         if: github.event.release.prerelease == true
         id: docker_build_prerelease
@@ -46,3 +47,4 @@ jobs:
             ghcr.io/devfolioco/siwe-oidc:${{ github.event.release.tag_name }}
           build-args: |
             INFURA_ID=${{ secrets.INFURA_ID }}
+            WALLET_CONNECT_ID=${{ secrets.WALLET_CONNECT_ID }}
