@@ -355,6 +355,7 @@ pub async fn token(
 #[derive(Deserialize)]
 pub struct AuthorizeParams {
     pub client_id: String,
+    pub action: String,
     pub redirect_uri: RedirectUrl,
     pub scope: Scope,
     pub response_type: Option<CoreResponseType>,
@@ -362,7 +363,7 @@ pub struct AuthorizeParams {
     pub nonce: Option<Nonce>,
     pub prompt: Option<CoreAuthPrompt>,
     pub request_uri: Option<RequestUrl>,
-    pub request: Option<String>,
+    pub request: Option<String>, 
 }
 
 pub async fn authorize(
@@ -487,8 +488,8 @@ pub async fn authorize(
     };
     Ok((
         format!(
-            "/?nonce={}&domain={}&redirect_uri={}&state={}&client_id={}{}",
-            nonce, domain, *params.redirect_uri, state, params.client_id, oidc_nonce_param
+            "/?nonce={}&domain={}&redirect_uri={}&state={}&action={}&client_id={}{}",
+            nonce, domain, *params.redirect_uri, state, params.action, params.client_id, oidc_nonce_param
         ),
         Box::new(session_cookie),
     ))
