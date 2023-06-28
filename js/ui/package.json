@@ -1,7 +1,7 @@
 {
   "name": "siwe-ui",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "scripts": {
     "dev": "webpack serve --port 9080",
     "build": "cross-env NODE_ENV=production webpack && mkdir -p ../../static && mv dist/* ../../static/",
