@@ -25,7 +25,7 @@
 	const { publicClient } = configureChains(chains, [w3mProvider({ projectId })]);
 	const wagmiConfig = createConfig({
 		autoConnect: true,
-		connectors: w3mConnectors({ projectId, version: 1, chains }),
+		connectors: w3mConnectors({ projectId, chains }),
 		publicClient,
 	});
 	const ethereumClient = new EthereumClient(wagmiConfig, chains);
@@ -44,7 +44,7 @@
 		if (account.isConnected) {
 			try {
 				const expirationTime = new Date(
-					new Date().getTime() + (2 * 24 * 60 * 60 * 1000) // 48h
+					new Date().getTime() + 2 * 24 * 60 * 60 * 1000, // 48h
 				);
 				const signMessage = new SiweMessage({
 					domain: window.location.host,
