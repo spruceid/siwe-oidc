@@ -21,7 +21,7 @@
 		"https-browserify": "^1.0.0",
 		"mini-css-extract-plugin": "^2.4.5",
 		"os-browserify": "^0.3.0",
-		"postcss": "^8.2.8",
+		"postcss": "^8.4.31",
 		"postcss-load-config": "^3.0.1",
 		"postcss-loader": "^6.2.1",
 		"precss": "^4.0.0",
