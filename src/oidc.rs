@@ -630,7 +630,7 @@ pub async fn sign_in(
         .map_err(|e| anyhow!("Failed message verification: {}", e))?;
 
     let domain = params.redirect_uri.url();
-    if let Some(r) = siwe_cookie.message.resources.get(0) {
+    if let Some(r) = siwe_cookie.message.resources.first() {
         if *domain != Url::from_str(r.as_ref()).unwrap() {
             return Err(anyhow!("Conflicting domains in message and redirect").into());
         }
