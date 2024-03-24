@@ -5,7 +5,7 @@
 	import { createWeb3Modal, defaultWagmiConfig } from '@web3modal/wagmi'
 
 	import { arbitrum, mainnet, polygon } from '@wagmi/core/chains';
-	import { getAccount, signMessage, getConnections, reconnect } from '@wagmi/core';
+	import { getAccount, signMessage, reconnect, getConnections} from '@wagmi/core';
 	import { SiweMessage } from 'siwe';
 	import Cookies from 'js-cookie';
 
@@ -26,15 +26,19 @@
 	const config = defaultWagmiConfig({
 		chains,
 		projectId,
+		enableCoinbase: false,
+		enableInjected: false,
 	})
-	
-	reconnect(config)
 
 	const web3modal = createWeb3Modal({
 		defaultChain: mainnet,
 		wagmiConfig: config,
   		projectId,
+		themeMode: 'dark',
+		featuredWalletIds: [],
 	});
+
+	reconnect(config)
 
 	let client_metadata = {};
 	onMount(async () => {
@@ -44,6 +48,7 @@
 			console.error(e);
 		}
 	});
+
 	web3modal.subscribeState(async (newState) => {
 
 		const account = getAccount(config);
@@ -71,7 +76,6 @@
 				await new Promise((resolve) => setTimeout(resolve, 1000));
 				
 				const signature = await signMessage(config,{
-					connector: account.connector,
 					message: preparedMessage,
 				});
 
