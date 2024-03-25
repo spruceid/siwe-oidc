@@ -49,12 +49,13 @@
 		"validate": "svelte-check"
 	},
 	"dependencies": {
-		"@wagmi/core": "^1.4.2",
-		"@web3modal/ethereum": "^2.7.1",
-		"@web3modal/html": "^2.7.1",
+		"@wagmi/core": "^2.6.9",
+		"@web3modal/wagmi": "^4.1.1",
+		"@web3modal/core": "^4.1.1",
+		"@web3modal/ui": "^4.1.1",
 		"js-cookie": "^3.0.5",
 		"siwe": "^2.1.4",
 		"url": "^0.11.0",
-		"viem": "^1.11.1"
+		"viem": "^2.8.18"
 	}
 }

@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { EthereumClient, w3mConnectors, w3mProvider } from '@web3modal/ethereum';
-	import { Web3Modal } from '@web3modal/html';
-	import { configureChains, createConfig } from '@wagmi/core';
+	
+	
+	import { createWeb3Modal, defaultWagmiConfig } from '@web3modal/wagmi'
+
 	import { arbitrum, mainnet, polygon } from '@wagmi/core/chains';
-	import { getAccount } from '@wagmi/core';
+	import { getAccount, signMessage, reconnect, getConnections} from '@wagmi/core';
 	import { SiweMessage } from 'siwe';
 	import Cookies from 'js-cookie';
 
@@ -20,16 +21,24 @@
 
 	$: status = 'Not Logged In';
 
-	const chains = [arbitrum, mainnet, polygon];
+	const chains = [mainnet, arbitrum, polygon];
 
-	const { publicClient } = configureChains(chains, [w3mProvider({ projectId })]);
-	const wagmiConfig = createConfig({
-		autoConnect: true,
-		connectors: w3mConnectors({ projectId, chains }),
-		publicClient,
+	const config = defaultWagmiConfig({
+		chains,
+		projectId,
+		enableCoinbase: false,
+		enableInjected: false,
+	})
+
+	const web3modal = createWeb3Modal({
+		defaultChain: mainnet,
+		wagmiConfig: config,
+  		projectId,
+		themeMode: 'dark',
+		featuredWalletIds: [],
 	});
-	const ethereumClient = new EthereumClient(wagmiConfig, chains);
-	const web3modal = new Web3Modal({ projectId }, ethereumClient);
+
+	reconnect(config)
 
 	let client_metadata = {};
 	onMount(async () => {
@@ -39,36 +48,40 @@
 			console.error(e);
 		}
 	});
-	web3modal.subscribeModal(async () => {
-		const account = getAccount();
+
+	web3modal.subscribeState(async (newState) => {
+
+		const account = getAccount(config);
+
 		if (account.isConnected) {
 			try {
 				const expirationTime = new Date(
 					new Date().getTime() + 2 * 24 * 60 * 60 * 1000, // 48h
 				);
-				const signMessage = new SiweMessage({
+
+				const msgToSign = new SiweMessage({
 					domain: window.location.host,
 					address: account.address,
-					chainId: await account.connector.getChainId(),
+					chainId: account.chainId,
 					expirationTime: expirationTime.toISOString(),
 					uri: window.location.origin,
 					version: '1',
 					statement: `You are signing-in to ${window.location.host}.`,
 					nonce,
 					resources: [redirect],
-				}).prepareMessage();
-
-				const signature = await (
-					await account.connector.getWalletClient()
-				).signMessage({
-					account: account.address,
-					message: signMessage,
 				});
 
-				const message = new SiweMessage(signMessage);
+				const preparedMessage = msgToSign.prepareMessage();
+				
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+				
+				const signature = await signMessage(config,{
+					message: preparedMessage,
+				});
+
 				const session = {
-					message,
-					raw: signMessage,
+					message: new SiweMessage(preparedMessage),
+					raw: msgToSign,
 					signature,
 				};
 				Cookies.set('siwe', JSON.stringify(session), {
@@ -114,7 +127,7 @@
 		<button
 			class="h-12 border hover:scale-105 justify-evenly shadow-xl border-white mt-4 duration-100 ease-in-out transition-all transform flex items-center"
 			on:click={() => {
-				web3modal.openModal();
+				web3modal.open();
 			}}
 		>
 			<svg
