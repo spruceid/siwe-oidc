@@ -3,3 +3,6 @@
 **/wrangler.toml
 **/node_module
 **/dist
+.idea
+/test/keys/fullchain.pem
+/test/keys/private_key.pem

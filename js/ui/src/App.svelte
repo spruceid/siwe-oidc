@@ -4,7 +4,7 @@
 	
 	import { createWeb3Modal, defaultWagmiConfig } from '@web3modal/wagmi'
 
-	import { arbitrum, mainnet, polygon } from '@wagmi/core/chains';
+	import { sepolia } from '@wagmi/core/chains';
 	import { getAccount, signMessage, reconnect, getConnections} from '@wagmi/core';
 	import { SiweMessage } from 'siwe';
 	import Cookies from 'js-cookie';
@@ -21,7 +21,7 @@
 
 	$: status = 'Not Logged In';
 
-	const chains = [mainnet, arbitrum, polygon];
+	const chains = [sepolia];
 
 	const config = defaultWagmiConfig({
 		chains,
@@ -31,7 +31,7 @@
 	})
 
 	const web3modal = createWeb3Modal({
-		defaultChain: mainnet,
+		defaultChain: sepolia,
 		wagmiConfig: config,
   		projectId,
 		themeMode: 'dark',
