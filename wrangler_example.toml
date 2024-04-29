@@ -24,7 +24,7 @@ tag = "v1"
 new_classes = ["DOCodes"]
 
 [build]
-command = "cargo install -q worker-build && worker-build --release"
+command = "cargo install -q worker-build --version 0.0.8 && worker-build --release"
 
 [build.upload]
 dir    = "build/worker"
