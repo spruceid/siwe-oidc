@@ -104,6 +104,8 @@
 	if (oidc_nonce != null && oidc_nonce != '') {
 		oidc_nonce_param = `&oidc_nonce=${oidc_nonce}`;
 	}
+
+	web3modal.open();
 </script>
 
 <div
