@@ -84,7 +84,7 @@ module.exports = {
 			},
 			{
 				// required to prevent errors from Svelte on Webpack 5+
-				test: /node_modules\/svelte\/.*\.mjs$/,
+				test: /\.m?js$/,
 				resolve: {
 					fullySpecified: false
 				}
