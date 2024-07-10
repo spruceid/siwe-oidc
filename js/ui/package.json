@@ -50,9 +50,9 @@
 	},
 	"dependencies": {
 		"@wagmi/core": "^2.6.9",
-		"@web3modal/wagmi": "^5.0.6",
-		"@web3modal/core": "^5.0.6",
-		"@web3modal/ui": "^5.0.6",
+		"@web3modal/wagmi": "^4.1.1",
+		"@web3modal/core": "^4.1.1",
+		"@web3modal/ui": "^4.1.1",
 		"js-cookie": "^3.0.5",
 		"siwe": "^2.1.4",
 		"url": "^0.11.0",
