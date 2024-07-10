@@ -38,10 +38,11 @@
 		featuredWalletIds: [],
 	});
 
+	reconnect(config)
+
 	let client_metadata = {};
 	onMount(async () => {
 		try {
-			reconnect(config).then(() => web3modal.open())
 			client_metadata = fetch(`${window.location.origin}/client/${client_id}`).then((response) => response.json());
 		} catch (e) {
 			console.error(e);
@@ -71,9 +72,8 @@
 				});
 
 				const preparedMessage = msgToSign.prepareMessage();
-
-				// no clue why this was needed
-				// await new Promise((resolve) => setTimeout(resolve, 1000));
+				
+				await new Promise((resolve) => setTimeout(resolve, 1000));
 				
 				const signature = await signMessage(config,{
 					message: preparedMessage,
@@ -105,6 +105,7 @@
 		oidc_nonce_param = `&oidc_nonce=${oidc_nonce}`;
 	}
 
+	web3modal.open();
 </script>
 
 <div
