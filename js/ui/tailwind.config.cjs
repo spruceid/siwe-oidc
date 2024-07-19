@@ -56,7 +56,7 @@ module.exports = {
 			},
 			fontFamily: {
 				poppins: ['Poppins'],
-				satoshi: ['Satoshi'],
+				nunito: ['Nunito'],
 				inter: ['Inter'],
 				inconsolata: ['Inconsolata'],
 				rajdhani: ['Rajdhani'],

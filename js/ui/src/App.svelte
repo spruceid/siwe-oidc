@@ -1,23 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	
-	
-	import { createWeb3Modal, defaultWagmiConfig } from '@web3modal/wagmi'
+
+	import { createWeb3Modal, defaultWagmiConfig } from '@web3modal/wagmi';
 
 	import { sepolia } from '@wagmi/core/chains';
-	import { getAccount, signMessage, reconnect, getConnections} from '@wagmi/core';
+	import { getAccount, signMessage, reconnect, getConnections } from '@wagmi/core';
 	import { SiweMessage } from 'siwe';
 	import Cookies from 'js-cookie';
 
 	// TODO: REMOVE DEFAULTS:
 	// main.ts will parse the params from the server
-	export let domain: string;
+	/* 	export let domain: string; */
 	export let nonce: string;
 	export let redirect: string;
 	export let state: string;
 	export let oidc_nonce: string;
 	export let client_id: string;
-	const projectId: string = process.env.PROJECT_ID;
+	const projectId: string = '1';
 
 	$: status = 'Not Logged In';
 
@@ -28,17 +27,17 @@
 		projectId,
 		enableCoinbase: false,
 		enableInjected: false,
-	})
+	});
 
 	const web3modal = createWeb3Modal({
 		defaultChain: sepolia,
 		wagmiConfig: config,
-  		projectId,
+		projectId,
 		themeMode: 'dark',
 		featuredWalletIds: [],
 	});
 
-	reconnect(config)
+	reconnect(config);
 
 	let client_metadata = {};
 	onMount(async () => {
@@ -50,7 +49,6 @@
 	});
 
 	web3modal.subscribeState(async (newState) => {
-
 		const account = getAccount(config);
 
 		if (account.isConnected) {
@@ -72,10 +70,10 @@
 				});
 
 				const preparedMessage = msgToSign.prepareMessage();
-				
+
 				await new Promise((resolve) => setTimeout(resolve, 1000));
-				
-				const signature = await signMessage(config,{
+
+				const signature = await signMessage(config, {
 					message: preparedMessage,
 				});
 
@@ -107,56 +105,33 @@
 </script>
 
 <div
-	class="bg-no-repeat bg-cover bg-center bg-swe-landing font-satoshi bg-gray flex-grow w-full h-screen items-center flex justify-center flex-wrap flex-col"
-	style="background-image: url('img/swe-landing.svg');"
+	class="bg-no-repeat bg-cover bg-center bg-swe-landing font-nunito bg-black flex-grow w-full h-screen flex flex-col items-center"
 >
-	<div class="w-96 text-center bg-white rounded-20 text-grey flex h-100 flex-col p-12 shadow-lg shadow-white">
-		{#if client_metadata.logo_uri}
+	<div class="p-8 flex justify-center"><img src="img/logo.png" alt="Quali chat logo" class="logo" /></div>
+	<div class="w-96 text-center bg-black rounded-20 text-white flex flex-col px-12 py-6">
+		<!-- 		{#if client_metadata.logo_uri}
 			<div class="flex justify-evenly items-stretch">
 				<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
 				<img height="72" width="72" class="self-center mb-8" src={client_metadata.logo_uri} alt="Client logo" />
 			</div>
 		{:else}
-			<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
-		{/if}
-		<h5>Welcome</h5>
-		<span class="text-xs">
+ -->
+		<img class="self-center mb-8 ethereum-image" src="img/ethereum.png" alt="Ethereum" />
+		<!-- 	{/if} -->
+		<h5 style="color: #FCA780">WELCOME!</h5>
+		<!-- 		<span class="text-xs">
 			Sign-In with Ethereum to continue to {client_metadata.client_name ? client_metadata.client_name : domain}
-		</span>
+		</span> -->
 
 		<button
-			class="h-12 border hover:scale-105 justify-evenly shadow-xl border-white mt-4 duration-100 ease-in-out transition-all transform flex items-center"
+			class="h-10 rounded-20 bg-white text-black justify-evenly flex items-center mt-8 mb-8"
 			on:click={() => {
 				web3modal.open();
 			}}
 		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				clip-rule="evenodd"
-				fill-rule="evenodd"
-				stroke-linejoin="round"
-				stroke-miterlimit="1.41421"
-				viewBox="170 30 220 350"
-				class="w-6 h-8"
-			>
-				<g fill-rule="nonzero" transform="matrix(.781253 0 0 .781253 180 37.1453)">
-					<path d="m127.961 0-2.795 9.5v275.668l2.795 2.79 127.962-75.638z" fill="#343434" /><path
-						d="m127.962 0-127.962 212.32 127.962 75.639v-133.801z"
-						fill="#8c8c8c"
-					/>
-					<path d="m127.961 312.187-1.575 1.92v98.199l1.575 4.601 128.038-180.32z" fill="#3c3c3b" /><path
-						d="m127.962 416.905v-104.72l-127.962-75.6z"
-						fill="#8c8c8c"
-					/>
-					<path d="m127.961 287.958 127.96-75.637-127.96-58.162z" fill="#141414" /><path
-						d="m.001 212.321 127.96 75.637v-133.799z"
-						fill="#393939"
-					/>
-				</g>
-			</svg>
-			<p class="font-bold">Sign-In with Ethereum</p>
+			Sign-In with Ethereum
 		</button>
-		<div class="self-center mt-auto text-center font-semibold text-xs">
+		<div class="self-center mt-auto text-center text-xs">
 			By using this service you agree to the <a href="/legal/terms-of-use.pdf">Terms of Use</a> and
 			<a href="/legal/privacy-policy.pdf">Privacy Policy</a>.
 		</div>
@@ -191,7 +166,7 @@
 		display: flex;
 		flex-direction: column;
 		overflow-x: hidden;
-		@apply font-satoshi;
+		@apply font-nunito;
 	}
 
 	h1,
@@ -201,7 +176,7 @@
 	h5,
 	h6 {
 		@apply font-extrabold;
-		@apply font-satoshi;
+		@apply font-nunito;
 	}
 
 	h1 {
@@ -246,12 +221,11 @@
 
 	a {
 		text-decoration: none;
-		color: #04d2ca;
+		color: #fca780;
 	}
 
 	td,
 	th {
-		font-family: 'Satoshi';
 		font-weight: 400;
 	}
 
@@ -261,6 +235,14 @@
 		white-space: -pre-wrap; /* Opera 4-6 */
 		white-space: -o-pre-wrap; /* Opera 7 */
 		word-wrap: break-word; /* Internet Explorer 5.5+ */
+	}
+
+	.logo {
+		width: 72px;
+	}
+
+	.ethereum-image {
+		max-width: 270px;
 	}
 
 	.web3modal-modal-lightbox {
