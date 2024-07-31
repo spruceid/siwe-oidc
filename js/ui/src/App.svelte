@@ -121,7 +121,7 @@
 		{/if}
 		<h5>Welcome</h5>
 		<span class="text-xs">
-			Sign-In with Ethereum to continue to {client_metadata.client_name ? client_metadata.client_name : domain}
+			Sign-In with Ethereum to continue to the Green Incentive Program
 		</span>
 
 		<button
