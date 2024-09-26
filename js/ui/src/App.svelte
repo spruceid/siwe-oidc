@@ -38,7 +38,7 @@
 
 	const web3modal = createAppKit({
 		adapters: [wagmiAdapter],
-		networks: [mainnet, sepolia],
+		networks,
 		metadata,
 		projectId,
 		features: {
