@@ -1,13 +1,11 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	
-	
-	import { createWeb3Modal, defaultWagmiConfig } from '@web3modal/wagmi'
-
-	import { arbitrum, mainnet, polygon } from '@wagmi/core/chains';
-	import { getAccount, signMessage, reconnect, getConnections} from '@wagmi/core';
-	import { SiweMessage } from 'siwe';
+	import { getAccount, reconnect, signMessage } from '@wagmi/core';
+	import { arbitrum, avalanche, mainnet, polygon } from '@wagmi/core/chains';
+	import { createWeb3Modal, defaultWagmiConfig } from '@web3modal/wagmi';
 	import Cookies from 'js-cookie';
+	import { SiweMessage } from 'siwe';
+	import { onMount } from 'svelte';
+	import EthLogo from './components/EthLogo.svelte';
 
 	// TODO: REMOVE DEFAULTS:
 	// main.ts will parse the params from the server
@@ -17,28 +15,29 @@
 	export let state: string;
 	export let oidc_nonce: string;
 	export let client_id: string;
-	const projectId: string = process.env.PROJECT_ID;
+	const projectId: string = process.env.PROJECT_ID ?? 'undefined';
 
+	// biome-ignore lint/suspicious/noGlobalAssign: <explanation>
 	$: status = 'Not Logged In';
 
-	const chains = [mainnet, arbitrum, polygon];
+	const chains = [mainnet, arbitrum, polygon, avalanche];
 
 	const config = defaultWagmiConfig({
 		chains,
 		projectId,
 		enableCoinbase: false,
 		enableInjected: false,
-	})
+	});
 
 	const web3modal = createWeb3Modal({
-		defaultChain: mainnet,
+		defaultChain: avalanche,
 		wagmiConfig: config,
-  		projectId,
+		projectId,
 		themeMode: 'dark',
 		featuredWalletIds: [],
 	});
 
-	reconnect(config)
+	reconnect(config);
 
 	let client_metadata = {};
 	onMount(async () => {
@@ -50,7 +49,6 @@
 	});
 
 	web3modal.subscribeState(async (newState) => {
-
 		const account = getAccount(config);
 
 		if (account.isConnected) {
@@ -72,11 +70,10 @@
 				});
 
 				const preparedMessage = msgToSign.prepareMessage();
-				
 				await new Promise((resolve) => setTimeout(resolve, 1000));
-				
-				const signature = await signMessage(config,{
+				const signature = await signMessage(config, {
 					message: preparedMessage,
+					account: account.address,
 				});
 
 				const session = {
@@ -101,7 +98,7 @@
 	});
 
 	let oidc_nonce_param = '';
-	if (oidc_nonce != null && oidc_nonce != '') {
+	if (oidc_nonce !== null && oidc_nonce !== '') {
 		oidc_nonce_param = `&oidc_nonce=${oidc_nonce}`;
 	}
 </script>
@@ -110,51 +107,28 @@
 	class="bg-no-repeat bg-cover bg-center bg-swe-landing font-satoshi bg-gray flex-grow w-full h-screen items-center flex justify-center flex-wrap flex-col"
 	style="background-image: url('img/swe-landing.svg');"
 >
-	<div class="w-96 text-center bg-white rounded-20 text-grey flex h-100 flex-col p-12 shadow-lg shadow-white">
+	<div
+		class="w-96 text-center bg-gray-650 text-white rounded-20 text-grey flex h-100 flex-col p-12 shadow-lg shadow-gray-600"
+	>
 		{#if client_metadata.logo_uri}
 			<div class="flex justify-evenly items-stretch">
-				<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
 				<img height="72" width="72" class="self-center mb-8" src={client_metadata.logo_uri} alt="Client logo" />
 			</div>
 		{:else}
-			<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="Ethereum logo" />
+			<img height="72" width="72" class="self-center mb-8" src="img/modal_icon.png" alt="SIWE logo" />
 		{/if}
-		<h5>Welcome</h5>
-		<span class="text-xs">
-			Sign-In with Ethereum to continue to {client_metadata.client_name ? client_metadata.client_name : domain}
+		<span class="text-m">
+			Sign in with your wallet to continue to {client_metadata.client_name ? client_metadata.client_name : domain}
 		</span>
 
 		<button
-			class="h-12 border hover:scale-105 justify-evenly shadow-xl border-white mt-4 duration-100 ease-in-out transition-all transform flex items-center"
+			class="h-12 border-2 rounded-20 hover:scale-[1.02] justify-center gap-3 shadow-xl border-gray-400 mt-4 duration-100 ease-in-out transition-all transform flex items-center"
 			on:click={() => {
 				web3modal.open();
 			}}
 		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				clip-rule="evenodd"
-				fill-rule="evenodd"
-				stroke-linejoin="round"
-				stroke-miterlimit="1.41421"
-				viewBox="170 30 220 350"
-				class="w-6 h-8"
-			>
-				<g fill-rule="nonzero" transform="matrix(.781253 0 0 .781253 180 37.1453)">
-					<path d="m127.961 0-2.795 9.5v275.668l2.795 2.79 127.962-75.638z" fill="#343434" /><path
-						d="m127.962 0-127.962 212.32 127.962 75.639v-133.801z"
-						fill="#8c8c8c"
-					/>
-					<path d="m127.961 312.187-1.575 1.92v98.199l1.575 4.601 128.038-180.32z" fill="#3c3c3b" /><path
-						d="m127.962 416.905v-104.72l-127.962-75.6z"
-						fill="#8c8c8c"
-					/>
-					<path d="m127.961 287.958 127.96-75.637-127.96-58.162z" fill="#141414" /><path
-						d="m.001 212.321 127.96 75.637v-133.799z"
-						fill="#393939"
-					/>
-				</g>
-			</svg>
-			<p class="font-bold">Sign-In with Ethereum</p>
+			<EthLogo />
+			<p class="font-bold">Connect Wallet</p>
 		</button>
 		<div class="self-center mt-auto text-center font-semibold text-xs">
 			By using this service you agree to the <a href="/legal/terms-of-use.pdf">Terms of Use</a> and

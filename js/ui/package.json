@@ -2,7 +2,9 @@
 	"name": "svelte-app",
 	"version": "1.0.0",
 	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
 		"@tsconfig/svelte": "^3.0.0",
+		"@types/js-cookie": "^3.0.6",
 		"@types/node": "^17.0.7",
 		"@typescript-eslint/eslint-plugin": "^5.9.0",
 		"@typescript-eslint/parser": "^5.9.0",
@@ -46,7 +48,8 @@
 	"scripts": {
 		"build": "cross-env NODE_ENV=production webpack",
 		"dev": "webpack serve --static-directory ../../static --port 9080",
-		"validate": "svelte-check"
+		"validate": "svelte-check",
+		"check": "biome check"
 	},
 	"dependencies": {
 		"@wagmi/core": "^2.6.9",
@@ -57,5 +60,6 @@
 		"siwe": "^2.1.4",
 		"url": "^0.11.0",
 		"viem": "^2.8.18"
-	}
+	},
+	"trustedDependencies": ["@biomejs/biome", "svelte-preprocess"]
 }
